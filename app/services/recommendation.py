@@ -76,6 +76,10 @@ class RecommendationService:
             popup_text=popup_text,
             confidence=profile.confidence_level,
             metric_used=result.get("metric_used", ""),
+            phase1_rank=result.get("phase1_rank"),
+            phase2_rank=result.get("phase2_rank"),
+            stat_score=result.get("stat_score"),
+            ml_score=result.get("ml_score"),
         )
 
     def compare_backends(

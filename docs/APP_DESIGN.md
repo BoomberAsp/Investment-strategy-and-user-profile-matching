@@ -1,9 +1,9 @@
 # 策略推荐网页应用：设计文档
 
-**版本**：V2.0
-**日期**：2026-05-23
+**版本**：V3.0
+**日期**：2026-05-24
 **框架**：Streamlit
-**状态**：待审核
+**状态**：执行中
 
 ---
 
@@ -15,7 +15,7 @@
 2. 通过问卷初始化用户画像并设定超参数 β
 3. 基于交易数据动态更新用户画像（EMA 动量式衰减）
 4. 展示个性化策略推荐与可解释归因
-5. 支持多算法后端切换（当前为统计 PCA 路线，预留 Word2Vec/Transformer 接入点）
+5. 支持多算法后端切换与融合（统计 PCA 路线 + LSTM 深度学习路线 + 融合加权路线）
 
 ---
 
@@ -42,7 +42,8 @@ Investment-strategy-and-user-profile-matching/
 │   │   ├── backends/
 │   │   │   ├── __init__.py
 │   │   │   ├── statistical.py           # PCA + 径向惩罚余弦（当前实现）
-│   │   │   └── word2vec.py              # 预留：Token + Word2Vec 嵌入（占位）
+│   │   │   ├── lstm.py                  # DLMethod: LSTM 128 维序列风格匹配
+│   │   │   └── fusion.py                # 统计 + LSTM 加权融合（α=0.7/0.3）
 │   │   ├── recommendation.py            # 推荐调度器（调用 MatchingBackend）
 │   │   └── popup_generator.py           # 客户端弹窗话术生成器
 │   ├── data/                            # 本地持久化数据
@@ -115,7 +116,7 @@ class UserProfile:
     source: str                     # "questionnaire" | "trade_data" | "hybrid"
     last_updated: str               # ISO 8601 时间戳
     questionnaire_scores: dict      # 各问卷原始得分（追溯用）
-    matching_backend: str           # 当前使用的匹配后端: "statistical" | "word2vec"
+    matching_backend: str           # 当前使用的匹配后端: "statistical" | "lstm" | "fusion"
 
     def ema_update(self, new_features: dict[str, float], lr: float = 0.3):
         """
@@ -165,12 +166,17 @@ class Questionnaire:
 @dataclass
 class MatchingResult:
     user_id: str
-    backend: str                  # "statistical" | "word2vec"
+    backend: str                  # "statistical" | "lstm" | "fusion"
     timestamp: str
     top_n: list[dict]             # [{"strategy": str, "similarity": float, "rank": int}, ...]
     explanation: dict             # 可解释归因
     popup_text: str               # 客户端弹窗话术
     confidence: str               # 与 UserProfile.confidence_level 一致
+    # LSTM/Fusion 特有字段
+    phase1_rank: dict[str, int] | None = None   # 特征基线排名
+    phase2_rank: dict[str, int] | None = None   # LSTM 排名
+    stat_score: dict[str, float] | None = None   # 统计归一化得分
+    ml_score: dict[str, float] | None = None     # LSTM 归一化得分
 ```
 
 ---
@@ -260,31 +266,82 @@ class StatisticalBackend(MatchingBackend):
         ...
 ```
 
-### 4.3 Word2VecBackend（预留占位）
+### 4.3 LSTMBackend（DLMethod 团队完成）
 
 ```python
-class Word2VecBackend(MatchingBackend):
+class LSTMBackend(MatchingBackend):
     """
-    Token 化 + Word2Vec 嵌入（技术储备，Phase 3 实现）
+    LSTM 128 维序列风格匹配（DLMethod 团队输出）
 
-    与 generate_simulated_data.py 生成的 token_sequences.txt 对接。
-    当前返回 NotImplementedError 或模拟结果。
+    数据源：DLMethod/ 目录下预训练好的 LSTM 编码器输出：
+      - matching_phase2_lstm.csv  → 账户 × 策略 LSTM 相似度矩阵
+      - final_recommendations.csv → Top-N 推荐长表（含 Phase1/Phase2 排名）
+
+    本质上是"查表式"匹配：用户上传交易数据后，用账户名映射
+    直接从预计算的相似度矩阵中读取该账户的推荐结果。
+    不依赖用户的 12 维特征向量，而是依赖交易序列的 token 风格匹配。
     """
 
     def name(self) -> str:
-        return "word2vec"
+        return "lstm"
 
     def fit(self, strategy_features, strategy_nav=None):
-        # 加载 gensim Word2Vec 模型
-        # 计算每个策略的文档向量（Token 嵌入平均）
+        """
+        1. 加载 matching_phase2_lstm.csv → 相似度矩阵 (Account × Strategy)
+        2. 加载 final_recommendations.csv → 推荐长表
+        3. 缓存供 predict() 查表使用
+        """
         ...
 
     def predict(self, user_features, beta=0.5, top_n=3, industry_vector=None):
-        # 用户 Token 序列 -> 文档向量 -> 余弦相似度
+        """
+        1. 将当前用户映射到 Account_A/B/C（或动态生成的账户名）
+        2. 从相似度矩阵中取出该账户的向量
+        3. 排序取 Top-N
+        4. 返回结果（不含 PCA 归因，但含 Phase1/Phase2 排名对比）
+        """
         ...
 ```
 
-### 4.4 后端注册与切换
+### 4.4 FusionBackend（统计 + LSTM 加权融合）
+
+```python
+class FusionBackend(MatchingBackend):
+    """
+    统计方法 + LSTM 辅助加权融合
+
+    融合公式（来自 ML_INTEGRATION_GUIDE.md）：
+        final_score = α * stat_norm + (1-α) * ml_norm
+    默认 α = 0.7（统计方法为主，LSTM 为序列风格辅助项）
+
+    步骤：
+    1. 调用 StatisticalBackend.predict() 得到统计得分矩阵
+    2. 调用 LSTMBackend.predict() 得到 LSTM 得分矩阵
+    3. 对齐共同的账户和策略
+    4. Min-Max 归一化到 0-1（避免量纲不同）
+    5. 加权融合 → 输出最终排名
+    """
+
+    def name(self) -> str:
+        return "fusion"
+
+    def fit(self, strategy_features, strategy_nav=None):
+        """同时 fit StatisticalBackend 和 LSTMBackend"""
+        ...
+
+    def predict(self, user_features, beta=0.5, top_n=3, industry_vector=None):
+        """
+        1. 分别获取统计得分和 LSTM 得分
+        2. Min-Max 归一化
+        3. 加权融合
+        4. 输出 Top-N + 双源归因
+        """
+        ...
+```
+
+### 4.5 后端注册与切换
+
+### 4.6 后端注册与切换
 
 ```python
 class BackendRegistry:
@@ -304,8 +361,24 @@ class BackendRegistry:
 
     def list_active(self) -> list[str]:
         """返回已 fit 过的后端"""
-        return [name for name, b in self._backends.items() if b._is_fitted]
+        return [name for name, b in self._backends.items() if getattr(b, "_is_fitted", False)]
 ```
+
+### 4.7 三后端定位与使用场景
+
+| 后端 | 定位 | 何时使用 | 推荐场景 |
+|------|------|---------|---------|
+| `statistical` | **主线**：12 维特征 + PCA + 径向惩罚余弦 | 用户画像完整、问卷填写充分 | 稳健展示、可解释性优先 |
+| `lstm` | **辅线**：交易序列风格相似度 | 用户上传了交易数据、想看到"序列风格"视角的推荐 | 候选策略排序、与统计方法互相验证 |
+| `fusion` | **推荐默认**：α=0.7 stat + 0.3 LSTM | 用户既有问卷画像又有交易数据 | 论文/汇报默认、综合推荐 |
+
+**融合权重可配置**（`config.py` 中 `FUSION_ALPHA`）：
+
+| 场景 | 统计方法权重 α | LSTM 权重 1-α |
+|------|---:|---:|
+| 稳健展示版 | 0.8 | 0.2 |
+| 平衡实验版（默认） | 0.7 | 0.3 |
+| 强调序列风格版 | 0.6 | 0.4 |
 
 ---
 
@@ -574,8 +647,8 @@ class RecommendationService:
         self, user_id: str, profile: UserProfile, top_n: int = 3,
     ) -> dict[str, MatchingResult]:
         """
-        对比所有已激活后端的推荐结果（用于 Phase 2 交叉验证可视化）。
-        返回: {"statistical": result1, "word2vec": result2, ...}
+        对比所有已激活后端的推荐结果（用于三路线交叉验证可视化）。
+        返回: {"statistical": result1, "lstm": result2, "fusion": result3, ...}
         """
         ...
 ```
@@ -792,48 +865,57 @@ def _blend_industry_similarity(
 ┌──────────────────────────────────────────────────────┐
 │  策略推荐                                              │
 │                                                      │
-│  匹配后端: [PCA 统计方法 ▼]                           │
+│  匹配后端: [融合推荐 (70%统计+30%LSTM) ▼]             │
 │  画像置信度: medium                                   │
 │                                                      │
 │  ┌─ 推荐结果 ───────────────────────────────┐        │
 │  │                                           │        │
 │  │  🥇 HX_朝花夕拾                            │        │
-│  │     匹配度: 17.8%                         │        │
+│  │     融合匹配度: 22.5%                      │        │
+│  │     统计排名: #2 (14.1%) | LSTM 排名: #1   │        │
 │  │     与您最相似的维度: 持仓周期、买卖对称性  │        │
 │  │     差异最大的维度: ETF偏好、趋势偏好       │        │
 │  │     [查看详情]                            │        │
 │  │                                           │        │
 │  │  🥈 GZ2000_综合_v10                       │        │
-│  │     匹配度: 10.3%                         │        │
+│  │     融合匹配度: 18.7%                      │        │
+│  │     统计排名: #1 (17.8%) | LSTM 排名: #4   │        │
 │  │     [查看详情]                            │        │
 │  │                                           │        │
 │  │  🥉 HS300_综合_v10                        │        │
-│  │     匹配度: -7.8% (风格方向相反)           │        │
+│  │     融合匹配度: 8.2%                       │        │
+│  │     统计排名: #3 (-7.8%) | LSTM 排名: #3   │        │
 │  │     [查看详情]                            │        │
 │  └──────────────────────────────────────────┘        │
 │                                                      │
 │  ┌─ 弹窗话术预览 ───────────────────────────┐        │
 │  │  "策略 HX_朝花夕拾 与您的投资风格匹配度    │        │
-│  │   17.8%。您在持仓周期、买卖对称性方面      │        │
-│  │   与该策略风格最为接近，建议进一步了解      │        │
-│  │   该策略。"                               │        │
+│  │   22.5%（统计 14.1% + LSTM 序列风格辅助）。│        │
+│  │   您在持仓周期、买卖对称性方面与该策略      │        │
+│  │   风格最为接近，建议进一步了解该策略。"     │        │
 │  └──────────────────────────────────────────┘        │
 └──────────────────────────────────────────────────────┘
 
-[展开详情] → 点击某策略后：
-┌──────────────────────────────────────────┐
-│  HX_朝花夕拾  详细匹配报告                 │
-│                                          │
-│  维度差异归因：                            │
-│  ┌────────────┬────────┬────────┬───────┐│
-│  │ 特征       │ 您     │ 策略   │ 差异  ││
-│  ├────────────┼────────┼────────┼───────┤│
-│  │ 持仓周期   │ 2天    │ 2天    │ ★ 极小││
-│  │ 换手率     │ 3.67   │ 3.20   │ ★ 小  ││
-│  │ ETF偏好    │ 0.01   │ 0.00   │       ││
-│  │ 趋势偏好   │ 0.15   │ 1.20   │ ⚠ 大  ││
-│  └────────────┴────────┴────────┴───────┘│
-└──────────────────────────────────────────┘
+[展开详情] → 点击某策略后（融合模式）：
+┌──────────────────────────────────────────────────┐
+│  HX_朝花夕拾  详细匹配报告                         │
+│                                                  │
+│  融合得分: 22.5% = 0.7×14.1%(统计) + 0.3×42.3%(LSTM)
+│                                                  │
+│  维度差异归因（统计侧）：                          │
+│  ┌────────────┬────────┬────────┬───────┐        │
+│  │ 特征       │ 您     │ 策略   │ 差异  │        │
+│  ├────────────┼────────┼────────┼───────┤        │
+│  │ 持仓周期   │ 2天    │ 2天    │ ★ 极小│        │
+│  │ 换手率     │ 3.67   │ 3.20   │ ★ 小  │        │
+│  │ ETF偏好    │ 0.01   │ 0.00   │       │        │
+│  │ 趋势偏好   │ 0.15   │ 1.20   │ ⚠ 大  │        │
+│  └────────────┴────────┴────────┴───────┘        │
+│                                                  │
+│  LSTM 序列风格:                                  │
+│  相似度 = 0.423 (排名 #1/34)                     │
+│  SHAP 驱动特征: 持仓周期 > 集中度 > 买卖对称性    │
+└──────────────────────────────────────────────────┘
 ```
 
 #### 页面 7：匹配稳定性（新增 — 滚动窗口分析）
@@ -863,14 +945,21 @@ def _blend_industry_similarity(
 └──────────────────────────────────────────────────────┘
 ```
 
-#### 页面 8：设置（新增）
+#### 页面 8：设置
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │  设置                                                  │
 │                                                      │
-│  匹配算法: [PCA 统计方法 ▼]                           │
-│            选项: PCA 统计方法 / Word2Vec (实验中)      │
+│  匹配算法: [融合推荐 (70%统计+30%LSTM) ▼]             │
+│            选项:                                       │
+│              - 融合推荐 (70%统计+30%LSTM) [默认]       │
+│              - PCA 统计方法                            │
+│              - LSTM 序列风格匹配                       │
+│                                                      │
+│  融合权重 α (仅融合模式):                              │
+│            [━━━━━━━━●━━━━━━━] 0.7                      │
+│            选项: 0.8(稳健) / 0.7(平衡) / 0.6(实验)    │
 │                                                      │
 │  β 超参数: 0.65 [━━━━━━━━●━━━━━━━]                    │
 │            (当前: 行为特征权重 65%)                    │
@@ -880,8 +969,10 @@ def _blend_industry_similarity(
 │  [ 导出画像数据 ]  [ 清除交易数据 ]                    │
 │                                                      │
 │  关于:                                                 │
-│  匹配方法: PCA + 径向惩罚余弦 (λ=1.0)                  │
-│  参考: report.md                                      │
+│  统计方法: PCA + 径向惩罚余弦 (λ=1.0)                  │
+│  LSTM 方法: BiLSTM 128 维序列风格匹配 (DLMethod)       │
+│  融合公式: final = α * stat_norm + (1-α) * ml_norm    │
+│  参考: report.md, DLMethod/ML_INTEGRATION_GUIDE.md    │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -971,7 +1062,7 @@ streamlit run app.py
 
 ## 十三、实现优先级（分阶段）
 
-### Phase 1（MVP — 本次实现）
+### Phase 1（MVP — 已完成）
 
 - 目录结构搭建
 - 数据模型定义（User, UserProfile, Questionnaire, MatchingResult）
@@ -984,24 +1075,25 @@ streamlit run app.py
 - Dashboard + 推荐页面 + 问卷页面 + 画像页面
 - 上传交易数据（基础版，全量分析）
 
-### Phase 2（后续迭代）
+### Phase 2（本次新增 — DLMethod ML 接入）
 
+- LSTMBackend 实现：加载 `matching_phase2_lstm.csv` + `final_recommendations.csv`
+- FusionBackend 实现：α=0.7 统计 + 0.3 LSTM，Min-Max 归一化加权融合
+- 账户名映射：webapp 用户 → `Account_A/B/C`（DLMethod 预计算矩阵的账户名）
+- 推荐页面升级：展示双源排名（统计排名 + LSTM 排名 + 融合排名）
+- 设置页面：后端切换（统计 / LSTM / 融合）、融合权重 α 调节
+- 多后端交叉验证可视化（稳定性分析页面对比三路线结果）
 - Level 2 问卷（8 题）+ β 精调
-- Level 3 问卷（10 题）+ 完整特征初始化
 - EMA 画像更新 + 置信度体系
 - 画像雷达图 + 变化轨迹可视化
-- 推荐详情维度对比表
-- 匹配稳定性分析页面（多窗口对比）
-- 后端切换（statistical ↔ word2vec 占位）
 
 ### Phase 3（生产级探索）
 
 - SQLite 替换 JSON 存储
 - bcrypt 替换 SHA-256 密码哈希
-- Word2VecBackend 实际接入
-- 多后端交叉验证可视化
 - 真实用户数据接入（非模拟）
 - 28 维申万行业分布 + JS 散度融合
+- LSTM 模型增量训练：当积累足够真实用户交易数据后重新训练
 
 ---
 
@@ -1014,7 +1106,7 @@ streamlit run app.py
 | 问卷分级 | 3 级渐进 | 降低初始门槛，可逐步深化 |
 | 画像更新 | EMA 动量 | 冷启动快、后期稳，类比 SGD Momentum |
 | 与 pipeline 关系 | 导入不修改 | 理论与应用代码解耦 |
-| 匹配引擎 | 抽象接口 + 多后端 | 支持统计/ML 路线并行与交叉验证 |
+| 匹配引擎 | 抽象接口 + 三后端 | 统计路线 + LSTM 序列风格 + 融合加权，三线并行 |
 | 行业匹配 | 先用 etf_ratio 代理，预留 28 维向量 | 与现有三层特征体系无缝衔接 |
 | 置信度体系 | 三级 (low/medium/high) | 类比贝叶斯收缩思想，冷启动透明化 |
 | 弹窗话术 | 独立组件 | 对应客户明确需求，可独立迭代文案 |
@@ -1022,3 +1114,145 @@ streamlit run app.py
 | Streamlit | 纯服务端 | 不引入前端框架，快速迭代 |
 
 请审阅以上设计文档，确认无误后开始编码实现。
+
+---
+
+## 十五、DLMethod 机器学习接入详细设计
+
+### 15.1 数据流概览
+
+```
+DLMethod/ (预训练输出)
+├── matching_phase2_lstm.csv     ← 3×34 相似度矩阵 (Account_A/B/C × 34 策略)
+├── final_recommendations.csv    ← Top-5 推荐长表 (含 Phase1/Phase2 排名)
+├── shap_analysis.json           ← SHAP 特征归因结果
+└── embedding_meta.json          ← 账户名/策略名映射
+
+Webapp 用户
+├── 注册 → L1 问卷 → 画像初始化 (统计侧冷启动)
+├── 上传交易数据 → EMA 更新画像 → StatisticalBackend 推荐
+└── 上传交易数据 → 账户名映射 → LSTMBackend 查表推荐
+                                      ↓
+                              FusionBackend 加权融合
+                                      ↓
+                              推荐页面展示三路线结果
+```
+
+### 15.2 账户名映射策略
+
+DLMethod 预计算的相似度矩阵使用 `Account_A`, `Account_B`, `Account_C` 三个账户名。
+Webapp 用户是动态注册的，无法一一对应。采用以下映射策略：
+
+| Webapp 用户状态 | 映射方式 | LSTM 结果使用 |
+|----------------|---------|-------------|
+| 第 1 个上传交易数据的用户 | → `Account_A` | 直接使用预计算矩阵 |
+| 第 2 个上传交易数据的用户 | → `Account_B` | 直接使用预计算矩阵 |
+| 第 3 个上传交易数据的用户 | → `Account_C` | 直接使用预计算矩阵 |
+| 第 4+ 个用户 | 无直接映射 | 仅展示统计推荐，LSTM 侧显示"数据不足" |
+
+**实现方式**：`LSTMBackend` 在 `fit()` 时记录已分配的账户映射，
+`assign_lstm_account(user_id)` 函数按上传顺序分配。
+
+**未来扩展**：当积累足够真实用户交易数据后，可以重新训练 LSTM 模型，
+生成更大规模的相似度矩阵（如 200 账户 × N 策略），此时映射不再是瓶颈。
+
+### 15.3 FusionBackend 融合流程
+
+```
+输入: user_features (12D), beta, top_n
+输出: 融合 Top-N 推荐
+
+1. StatisticalBackend.predict(user_features, beta, top_n)
+   → stat_scores: {strategy_name: raw_similarity}
+
+2. LSTMBackend.predict(user_features, beta, top_n)
+   → ml_scores: {strategy_name: lstm_cosine_similarity}
+
+3. 对齐共同策略集合:
+   common_strategies = set(stat_scores) ∩ set(ml_scores)
+
+4. Min-Max 归一化（各自内部归一化到 0-1）:
+   stat_norm[s] = (stat_scores[s] - min(stat)) / (max(stat) - min(stat))
+   ml_norm[s] = (ml_scores[s] - min(ml)) / (max(ml) - min(ml))
+
+5. 加权融合:
+   final_score[s] = α * stat_norm[s] + (1-α) * ml_norm[s]
+
+6. 排序取 Top-N，返回:
+   {
+       "top3": [{"strategy": s, "similarity": final_score[s], "rank": i}],
+       "explanation": {统计归因 + LSTM SHAP 归因},
+       "phase1_rank": {s: rank},    # 特征基线排名
+       "phase2_rank": {s: rank},    # LSTM 排名
+       "stat_score": {s: stat_norm[s]},
+       "ml_score": {s: ml_norm[s]},
+   }
+```
+
+### 15.4 三后端对比展示（稳定性分析页面扩展）
+
+稳定性分析页面原有"多窗口推荐对比"功能，新增"多算法路线对比"：
+
+```
+┌─ 三路线推荐对比 ────────────────────────────────────┐
+│  窗口: [全量数据 ▼]                                  │
+│                                                    │
+│  ┌──────────┬──────────────┬────────────┬─────────┐ │
+│  │ 排名     │ 统计方法     │ LSTM 序列  │ 融合    │ │
+│  ├──────────┼──────────────┼────────────┼─────────┤ │
+│  │ #1       │ GZ2000_综合  │ HX_朝花夕拾│ HX_朝花 │ │
+│  │ 得分     │ 17.8%        │ 42.3%      │ 22.5%   │ │
+│  ├──────────┼──────────────┼────────────┼─────────┤ │
+│  │ #2       │ HX_朝花夕拾  │ 行业etf增强│ GZ2000  │ │
+│  │ 得分     │ 10.3%        │ 38.1%      │ 18.7%   │ │
+│  ├──────────┼──────────────┼────────────┼─────────┤ │
+│  │ #3       │ HS300_综合   │ 综合全     │ HS300   │ │
+│  │ 得分     │ -7.8%        │ 25.6%      │ 8.2%    │ │
+│  └──────────┴──────────────┴────────────┴─────────┘ │
+│                                                    │
+│  结论: 统计方法推荐 GZ2000（高频小盘风格匹配），       │
+│        LSTM 推荐 HX_朝花夕拾（交易序列风格相似），     │
+│        融合后 HX_朝花夕拾排名第一。                  │
+└────────────────────────────────────────────────────┘
+```
+
+### 15.5 依赖与运行环境
+
+LSTMBackend 需要以下依赖（仅在 `lstm` 或 `fusion` 后端激活时加载）：
+
+```python
+# 条件导入，避免不影响 statistical 后端的轻量运行
+try:
+    import pandas as pd
+    import numpy as np
+    from sklearn.preprocessing import MinMaxScaler
+    HAS_LSTM_DEPS = True
+except ImportError:
+    HAS_LSTM_DEPS = False
+```
+
+DLMethod 预训练文件路径配置（`config.py`）：
+
+```python
+# DLMethod 输出文件路径
+DLMETHOD_DIR = Path(__file__).parent.parent / "DLMethod"
+LSTM_SIMILARITY_MATRIX = DLMETHOD_DIR / "matching_phase2_lstm.csv"
+LSTM_RECOMMENDATIONS = DLMETHOD_DIR / "final_recommendations.csv"
+LSTM_SHAP_ANALYSIS = DLMETHOD_DIR / "shap_analysis.json"
+LSTM_EMBEDDING_META = DLMETHOD_DIR / "embedding_meta.json"
+
+# 融合权重
+FUSION_ALPHA = 0.7  # 统计方法权重，1-alpha = LSTM 权重
+```
+
+### 15.6 方法边界声明（前端展示）
+
+在推荐页面和设置页面中，需要明确标注：
+
+> **LSTM 方法说明**：本系统的 LSTM 匹配模块基于小样本弱监督学习训练，
+> 训练标签来自交易画像相似度生成的伪标签。它适合作为统计方法的辅助补充，
+> 用于捕捉交易序列风格的相似性。最终推荐仍结合统计方法加权得出，
+> 并建议结合风险承受能力、人工校验等综合判断。
+
+在 SHAP 归因展示中，注明 Top-5 驱动特征：
+**持仓周期 > 集中度 > 买卖对称性 > 换手率 > 波动偏好**（行业偏好贡献极低）。

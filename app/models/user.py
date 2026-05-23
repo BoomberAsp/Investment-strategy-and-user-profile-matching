@@ -162,6 +162,11 @@ class MatchingResult:
     popup_text: str
     confidence: str
     metric_used: str = ""
+    # LSTM/Fusion 特有字段
+    phase1_rank: dict | None = None     # {strategy: phase1_rank}
+    phase2_rank: dict | None = None     # {strategy: phase2_rank}
+    stat_score: dict | None = None      # {strategy: normalized_stat_score}
+    ml_score: dict | None = None        # {strategy: normalized_ml_score}
 
     def to_dict(self) -> dict:
         return {
@@ -173,6 +178,10 @@ class MatchingResult:
             "popup_text": self.popup_text,
             "confidence": self.confidence,
             "metric_used": self.metric_used,
+            "phase1_rank": self.phase1_rank,
+            "phase2_rank": self.phase2_rank,
+            "stat_score": self.stat_score,
+            "ml_score": self.ml_score,
         }
 
     @classmethod

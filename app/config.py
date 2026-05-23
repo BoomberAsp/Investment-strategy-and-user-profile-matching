@@ -59,3 +59,18 @@ SW_INDUSTRIES = [
     "非银金融", "机械设备", "国防军工", "计算机", "传媒",
     "通信", "农林牧渔", "汽车",
 ]
+
+# === DLMethod 机器学习输出路径 ===
+DLMETHOD_DIR = PROJECT_ROOT / "DLMethod"
+LSTM_SIMILARITY_MATRIX = DLMETHOD_DIR / "matching_phase2_lstm.csv"
+LSTM_RECOMMENDATIONS = DLMETHOD_DIR / "final_recommendations.csv"
+LSTM_SHAP_ANALYSIS = DLMETHOD_DIR / "shap_analysis.json"
+LSTM_EMBEDDING_META = DLMETHOD_DIR / "embedding_meta.json"
+
+# === 融合权重 ===
+FUSION_ALPHA = 0.7  # 统计方法权重，1-alpha = LSTM 权重
+FUSION_ALPHA_OPTIONS = {
+    "稳健展示版": 0.8,
+    "平衡实验版": 0.7,
+    "强调序列风格版": 0.6,
+}

@@ -33,7 +33,8 @@ def init_services():
     from app.services.profile import ProfileService
     from app.services.matching_backend import BackendRegistry
     from app.services.backends.statistical import StatisticalBackend
-    from app.services.backends.word2vec import Word2VecBackend
+    from app.services.backends.lstm import LSTMBackend
+    from app.services.backends.fusion import FusionBackend
     from app.services.recommendation import RecommendationService
     from app.services.popup_generator import PopupGenerator
 
@@ -58,9 +59,20 @@ def init_services():
     stat_backend.fit(strategy_features, strategy_nav)
     registry.register(stat_backend)
 
-    w2v_backend = Word2VecBackend()
-    # w2v_backend.fit(strategy_features, strategy_nav)  # Phase 3
-    registry.register(w2v_backend)
+    # LSTM 后端
+    lstm_backend = LSTMBackend()
+    lstm_available = True
+    try:
+        lstm_backend.fit(strategy_features, strategy_nav)
+    except FileNotFoundError:
+        lstm_available = False
+    registry.register(lstm_backend)
+
+    # 融合后端
+    fusion_backend = FusionBackend(stat_backend, lstm_backend)
+    if lstm_available:
+        fusion_backend.fit(strategy_features, strategy_nav)
+    registry.register(fusion_backend)
 
     # 推荐服务
     popup_gen = PopupGenerator()
@@ -78,6 +90,9 @@ def init_services():
         "profile_svc": profile_svc,
         "registry": registry,
         "stat_backend": stat_backend,
+        "lstm_backend": lstm_backend,
+        "lstm_available": lstm_available,
+        "fusion_backend": fusion_backend,
         "recommendation_svc": recommendation_svc,
         "popup_gen": popup_gen,
         "strategy_features": strategy_features,
@@ -516,7 +531,19 @@ def show_upload_page():
                     window_days=window_options[selected_window],
                 )
 
-                st.success(f"上传成功！画像已更新（第 {profile.update_count} 次更新，置信度: {profile.confidence_level}）")
+                # 分配 LSTM 账户名（首次上传时自动分配）
+                lstm_account_msg = ""
+                if services["lstm_available"]:
+                    assigned = services["lstm_backend"].assign_account(user.user_id)
+                    if assigned:
+                        lstm_account_msg = f"，已分配 LSTM 账户: {assigned}"
+                    else:
+                        lstm_account_msg = "（LSTM 账户槽位已满，仅支持前 3 个上传用户）"
+
+                st.success(
+                    f"上传成功！画像已更新（第 {profile.update_count} 次更新，"
+                    f"置信度: {profile.confidence_level}）{lstm_account_msg}"
+                )
 
                 # 显示提取的特征
                 with st.expander("查看提取的特征"):
@@ -660,6 +687,17 @@ def _plot_history_trajectory(profile):
 # 推荐策略页面
 # ============================================================
 
+_BACKEND_DISPLAY = {
+    "statistical": "PCA 统计方法",
+    "lstm": "LSTM 序列风格匹配",
+    "fusion": "融合推荐 (统计 + LSTM)",
+}
+
+
+def _display_backend_label(backend_name: str) -> str:
+    return _BACKEND_DISPLAY.get(backend_name, backend_name)
+
+
 def show_recommendation_page():
     user = st.session_state["current_user"]
     st.title("策略推荐")
@@ -671,10 +709,17 @@ def show_recommendation_page():
 
     # 后端选择
     available_backends = services["registry"].list_active()
+    # Default to fusion if available, else first available
+    default_backend = "fusion" if "fusion" in available_backends else (available_backends[0] if available_backends else None)
+    default_idx = 0
+    if default_backend and default_backend in available_backends:
+        default_idx = available_backends.index(default_backend)
+
     backend_choice = st.selectbox(
         "匹配算法",
         available_backends,
-        format_func=lambda x: {"statistical": "PCA 统计方法"}.get(x, x),
+        index=default_idx,
+        format_func=_display_backend_label,
     )
 
     if backend_choice:
@@ -685,8 +730,24 @@ def show_recommendation_page():
         st.divider()
 
         if not result.top_n:
-            st.info("暂无匹配结果。")
+            if backend_choice == "lstm" and not services["lstm_available"]:
+                st.warning(
+                    "LSTM 后端不可用：DLMethod 预训练文件未找到。\n"
+                    "请先在 DLMethod/ 目录下运行 step1-step7 流水线。"
+                )
+            else:
+                st.info("暂无匹配结果。")
             return
+
+        # LSTM 账户映射状态提示
+        if backend_choice == "lstm":
+            assigned = services["lstm_backend"].get_assigned_accounts()
+            st.caption(f"已分配 LSTM 账户: {assigned}")
+            if not assigned:
+                st.info(
+                    "提示：请先上传交易数据以分配 LSTM 账户名。"
+                    "系统最多支持 3 个账户的 LSTM 匹配。"
+                )
 
         # 推荐结果
         st.subheader("推荐结果")
@@ -694,10 +755,37 @@ def show_recommendation_page():
             sim_pct = rec["similarity"] * 100
             explanation = result.explanation
 
+            # 融合模式下展示双源排名
+            extra_info = ""
+            if backend_choice == "fusion" and result.stat_score and result.ml_score:
+                stat_s = result.stat_score.get(rec["strategy"], 0)
+                ml_s = result.ml_score.get(rec["strategy"], 0)
+                stat_r = result.phase1_rank.get(rec["strategy"], "—")
+                ml_r = result.phase2_rank.get(rec["strategy"], "—")
+                extra_info = f"\n    统计得分: {stat_s * 100:.1f}% (Phase1 排名 #{stat_r})"
+                extra_info += f" | LSTM 得分: {ml_s * 100:.1f}% (Phase2 排名 #{ml_r})"
+            elif backend_choice == "lstm":
+                ml_r = result.phase2_rank.get(rec["strategy"], "—")
+                p1_r = result.phase1_rank.get(rec["strategy"], "—")
+                extra_info = f"\n    LSTM 排名: #{ml_r} | 特征基线排名: #{p1_r}"
+
             if sim_pct >= 0:
-                with st.expander(f"🥇{'🥈' if rec['rank'] == 2 else '🥉' if rec['rank'] == 3 else ''} #{rec['rank']} {rec['strategy']} — 匹配度 {sim_pct:.1f}%", expanded=(rec['rank'] == 1)):
+                with st.expander(f"🥇{'🥈' if rec['rank'] == 2 else '🥉' if rec['rank'] == 3 else ''} #{rec['rank']} {rec['strategy']} — 匹配度 {sim_pct:.1f}%{extra_info}", expanded=(rec['rank'] == 1)):
                     st.markdown(f"**策略**: {rec['strategy']}")
                     st.markdown(f"**匹配度**: {sim_pct:.1f}%")
+
+                    # 融合模式额外信息
+                    if backend_choice == "fusion":
+                        alpha = explanation.get("fusion_alpha", 0.7)
+                        st.caption(
+                            f"融合权重: 统计 {alpha * 100:.0f}% + LSTM {(1 - alpha) * 100:.0f}%"
+                        )
+
+                    # LSTM SHAP 归因
+                    if explanation.get("lstm_shap_top_features"):
+                        st.markdown("**LSTM 驱动特征 (SHAP)**:")
+                        for sf in explanation["lstm_shap_top_features"]:
+                            st.markdown(f"- {sf['feature']} (|SHAP|={sf['mean_abs_shap']:.4f})")
 
                     # 维度对比
                     if explanation.get("most_similar_dimensions"):
@@ -809,6 +897,62 @@ def show_stability_page():
     elif top1_strategies:
         st.success(f"✅ 各窗口下 Top-1 策略一致: {top1_strategies[0]}，匹配稳定。")
 
+    # 多算法路线对比
+    st.divider()
+    st.subheader("三路线推荐对比")
+    st.caption("对比统计方法、LSTM 序列风格匹配、融合推荐三种算法的 Top-3 结果。")
+
+    active_backends = services["registry"].list_active()
+    if len(active_backends) >= 2:
+        from app.models.user import UserProfile
+        features = services["extractor"].extract_user_features(trades_df)
+        features["_user_id"] = user.user_id
+        temp_profile = UserProfile(
+            user_id=user.user_id,
+            beta=profile.beta,
+            features=features,
+            confidence_level="high",
+        )
+
+        comparison_rows = []
+        for backend_name in active_backends:
+            try:
+                rec = services["recommendation_svc"].recommend(
+                    user.user_id, features, temp_profile,
+                    backend_name=backend_name, top_n=3,
+                )
+                for i, item in enumerate(rec.top_n):
+                    comparison_rows.append({
+                        "算法": _display_backend_label(backend_name),
+                        "排名": f"#{item['rank']}",
+                        "策略": item["strategy"],
+                        "匹配度": f"{item['similarity'] * 100:.1f}%",
+                    })
+            except Exception as e:
+                comparison_rows.append({
+                    "算法": _display_backend_label(backend_name),
+                    "排名": "—",
+                    "策略": f"错误: {e}",
+                    "匹配度": "—",
+                })
+
+        if comparison_rows:
+            comp_df = pd.DataFrame(comparison_rows)
+            st.dataframe(comp_df, use_container_width=True)
+
+            # 跨算法 Top-1 一致性检查
+            top1_per_backend = {}
+            for row in comparison_rows:
+                if row["排名"] == "#1":
+                    top1_per_backend[row["算法"]] = row["策略"]
+
+            unique_top1 = set(top1_per_backend.values())
+            if len(unique_top1) == 1:
+                st.success(f"✅ 所有算法 Top-1 一致: {list(unique_top1)[0]}")
+            else:
+                details = ", ".join(f"{algo}: {s}" for algo, s in top1_per_backend.items())
+                st.info(f"不同算法推荐了不同的策略: {details}")
+
 
 # ============================================================
 # 设置页面
@@ -823,7 +967,62 @@ def show_settings_page():
         st.info("请先完成问卷。")
         return
 
+    # 匹配算法选择
+    st.subheader("匹配算法")
+    available_backends = services["registry"].list_active()
+    current_backend = profile.matching_backend if profile.matching_backend in available_backends else available_backends[0]
+    selected_backend = st.selectbox(
+        "选择默认匹配后端",
+        available_backends,
+        index=available_backends.index(current_backend) if current_backend in available_backends else 0,
+        format_func=_display_backend_label,
+    )
+    if selected_backend != profile.matching_backend:
+        if st.button("应用后端切换"):
+            profile.matching_backend = selected_backend
+            services["storage"].save_profile(profile)
+            st.success(f"默认后端已切换为: {_display_backend_label(selected_backend)}")
+            st.rerun()
+
+    # 融合权重（仅融合模式）
+    if "fusion" in available_backends:
+        st.divider()
+        st.subheader("融合权重 α")
+        from app.config import FUSION_ALPHA_OPTIONS
+        alpha_labels = list(FUSION_ALPHA_OPTIONS.keys())
+        alpha_values = list(FUSION_ALPHA_OPTIONS.values())
+        current_alpha = services["fusion_backend"]._alpha
+        # Find closest label
+        closest_idx = min(range(len(alpha_values)), key=lambda i: abs(alpha_values[i] - current_alpha))
+        selected_label = st.selectbox(
+            "统计方法与 LSTM 的权重比例",
+            alpha_labels,
+            index=closest_idx,
+        )
+        new_alpha = FUSION_ALPHA_OPTIONS[selected_label]
+        if new_alpha != current_alpha:
+            if st.button("应用融合权重"):
+                services["fusion_backend"].set_alpha(new_alpha)
+                st.success(f"融合权重已更新: 统计 {new_alpha * 100:.0f}% + LSTM {(1 - new_alpha) * 100:.0f}%")
+                st.rerun()
+
+    # LSTM 状态
+    if services["lstm_available"]:
+        st.divider()
+        st.subheader("LSTM 后端状态")
+        assigned = services["lstm_backend"].get_assigned_accounts()
+        if assigned:
+            st.caption(f"已分配 LSTM 账户: {assigned}")
+        else:
+            st.caption("尚无用户分配 LSTM 账户。用户首次上传交易数据后将自动分配。")
+        st.caption(
+            "LSTM 方法说明：本系统的 LSTM 匹配模块基于小样本弱监督学习训练，"
+            "训练标签来自交易画像相似度生成的伪标签。它适合作为统计方法的辅助补充，"
+            "用于捕捉交易序列风格的相似性。最终推荐仍结合统计方法加权得出。"
+        )
+
     # β 调整
+    st.divider()
     st.subheader("β 超参数")
     st.caption(f"当前: {profile.beta:.2f} (行为特征权重 {profile.beta * 100:.0f}%)")
 
@@ -854,10 +1053,12 @@ def show_settings_page():
     # 关于
     st.divider()
     st.subheader("关于")
-    st.markdown("""
-- **匹配方法**: PCA + 径向惩罚余弦 (λ=1.0)
-- **参考文档**: `report.md`
-- **版本**: App V1.0 / Pipeline V2.0
+    st.markdown(f"""
+- **统计方法**: PCA + 径向惩罚余弦 (λ=1.0)
+- **LSTM 方法**: BiLSTM 128 维序列风格匹配 (DLMethod 团队)
+- **融合公式**: final = α × stat_norm + (1-α) × ml_norm
+- **参考文档**: `report.md`, `DLMethod/ML_INTEGRATION_GUIDE.md`
+- **版本**: App V2.0 / Pipeline V2.0
     """)
 
 
