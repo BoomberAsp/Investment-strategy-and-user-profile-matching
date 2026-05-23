@@ -172,7 +172,7 @@ def parse_user_trades(user_df):
     qty_col = user_df.columns[5]
 
     trades = pd.DataFrame({
-        'trade_date': user_df[date_col],
+        'trade_date': pd.to_datetime(user_df[date_col], format='%Y%m%d', errors='coerce'),
         'action_type': user_df[action_col],
         'symbol': user_df[sym_col].astype(str),
         'price': user_df[price_col],
@@ -563,6 +563,8 @@ def apply_beta_weighting(feature_dict, beta):
     """
     weighted = {}
     for fname, fval in feature_dict.items():
+        if fname not in MATCH_FEATURES:
+            continue  # skip meta keys like _user_id
         if FEATURE_GROUPS.get(fname) == 'behavior':
             weighted[fname] = fval * beta
         else:
