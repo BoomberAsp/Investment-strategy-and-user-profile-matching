@@ -1,0 +1,458 @@
+{
+  "radial_penalty": {
+    "A": {
+      "top3": [
+        {
+          "strategy": "宽指配置_V251216",
+          "similarity": 0.13355702970116023,
+          "rank": 1
+        },
+        {
+          "strategy": "集中_红利增强_V20_251229",
+          "similarity": 0.09290073866829843,
+          "rank": 2
+        },
+        {
+          "strategy": "集中_行业轮动_V251111701",
+          "similarity": 0.06383700859222498,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "A",
+        "matched_strategy": "宽指配置_V251216",
+        "overall_similarity": 0.1336,
+        "most_similar_dimensions": [
+          {
+            "feature": "换手率",
+            "diff": 0.0146
+          },
+          {
+            "feature": "买卖对称性",
+            "diff": 0.1353
+          },
+          {
+            "feature": "胜率",
+            "diff": 0.2047
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "趋势偏好",
+            "diff": 1.2029
+          },
+          {
+            "feature": "ETF偏好",
+            "diff": 1.0
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 宽指配置_V251216 与您的投资风格匹配度 13.4%。您在 换手率、买卖对称性、胜率 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "B": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": 0.17767493911627416,
+          "rank": 1
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.10323388250782994,
+          "rank": 2
+        },
+        {
+          "strategy": "HS300_综合_v10",
+          "similarity": -0.07754875210838476,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "B",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": 0.1777,
+        "most_similar_dimensions": [
+          {
+            "feature": "持仓周期",
+            "diff": 0.0
+          },
+          {
+            "feature": "买卖对称性",
+            "diff": 0.0325
+          },
+          {
+            "feature": "分仓均匀度",
+            "diff": 0.1774
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "ETF偏好",
+            "diff": 1.0
+          },
+          {
+            "feature": "趋势偏好",
+            "diff": 0.9551
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格匹配度 17.8%。您在 持仓周期、买卖对称性、分仓均匀度 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "C": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": 0.2233610478907717,
+          "rank": 1
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.04804692598602545,
+          "rank": 2
+        },
+        {
+          "strategy": "HS300_综合_v10",
+          "similarity": -0.11525320700915599,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "C",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": 0.2234,
+        "most_similar_dimensions": [
+          {
+            "feature": "亏损幅度",
+            "diff": 0.0116
+          },
+          {
+            "feature": "买卖对称性",
+            "diff": 0.0473
+          },
+          {
+            "feature": "分仓均匀度",
+            "diff": 0.1674
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "趋势偏好",
+            "diff": 1.0158
+          },
+          {
+            "feature": "ETF偏好",
+            "diff": 1.0
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格匹配度 22.3%。您在 亏损幅度、买卖对称性、分仓均匀度 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    }
+  },
+  "cosine": {
+    "A": {
+      "top3": [
+        {
+          "strategy": "HS300_综合_v10",
+          "similarity": 0.6990666883525029,
+          "rank": 1
+        },
+        {
+          "strategy": "宽指配置_V251216",
+          "similarity": 0.45176145394339473,
+          "rank": 2
+        },
+        {
+          "strategy": "集中_红利增强_V20_251229",
+          "similarity": 0.30806526880469787,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "A",
+        "matched_strategy": "HS300_综合_v10",
+        "overall_similarity": 0.6991,
+        "most_similar_dimensions": [
+          {
+            "feature": "买卖对称性",
+            "diff": 0.0079
+          },
+          {
+            "feature": "分仓均匀度",
+            "diff": 0.088
+          },
+          {
+            "feature": "亏损幅度",
+            "diff": 0.288
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "趋势偏好",
+            "diff": 1.3106
+          },
+          {
+            "feature": "ETF偏好",
+            "diff": 1.0
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 HS300_综合_v10 与您的投资风格匹配度 69.9%。您在 买卖对称性、分仓均匀度、亏损幅度 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "B": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": 0.6192162026873111,
+          "rank": 1
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.5518999110953128,
+          "rank": 2
+        },
+        {
+          "strategy": "CYB300_综合_v10",
+          "similarity": -0.23489962382723173,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "B",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": 0.6192,
+        "most_similar_dimensions": [
+          {
+            "feature": "持仓周期",
+            "diff": 0.0
+          },
+          {
+            "feature": "买卖对称性",
+            "diff": 0.0325
+          },
+          {
+            "feature": "分仓均匀度",
+            "diff": 0.1774
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "ETF偏好",
+            "diff": 1.0
+          },
+          {
+            "feature": "趋势偏好",
+            "diff": 0.9551
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格匹配度 61.9%。您在 持仓周期、买卖对称性、分仓均匀度 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "C": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": 0.8690692634606114,
+          "rank": 1
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.23007681388215304,
+          "rank": 2
+        },
+        {
+          "strategy": "CYB300_综合_v10",
+          "similarity": -0.5789333819785418,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "C",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": 0.8691,
+        "most_similar_dimensions": [
+          {
+            "feature": "亏损幅度",
+            "diff": 0.0116
+          },
+          {
+            "feature": "买卖对称性",
+            "diff": 0.0473
+          },
+          {
+            "feature": "分仓均匀度",
+            "diff": 0.1674
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "趋势偏好",
+            "diff": 1.0158
+          },
+          {
+            "feature": "ETF偏好",
+            "diff": 1.0
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格匹配度 86.9%。您在 亏损幅度、买卖对称性、分仓均匀度 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    }
+  },
+  "euclidean": {
+    "A": {
+      "top3": [
+        {
+          "strategy": "宽指配置_V251216",
+          "similarity": 0.07415349318039184,
+          "rank": 1
+        },
+        {
+          "strategy": "集中_红利增强_V20_251229",
+          "similarity": 0.07084454512061847,
+          "rank": 2
+        },
+        {
+          "strategy": "HS300_综合_v10",
+          "similarity": 0.0692803729265485,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "A",
+        "matched_strategy": "宽指配置_V251216",
+        "overall_similarity": 0.0742,
+        "most_similar_dimensions": [
+          {
+            "feature": "换手率",
+            "diff": 0.0146
+          },
+          {
+            "feature": "买卖对称性",
+            "diff": 0.1353
+          },
+          {
+            "feature": "胜率",
+            "diff": 0.2047
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "趋势偏好",
+            "diff": 1.2029
+          },
+          {
+            "feature": "ETF偏好",
+            "diff": 1.0
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 宽指配置_V251216 与您的投资风格匹配度 7.4%。您在 换手率、买卖对称性、胜率 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "B": {
+      "top3": [
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.19165834675395682,
+          "rank": 1
+        },
+        {
+          "strategy": "HS300_综合_v10",
+          "similarity": 0.16650075564362188,
+          "rank": 2
+        },
+        {
+          "strategy": "CYB300_综合_v10",
+          "similarity": 0.1552003050833166,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "B",
+        "matched_strategy": "GZ2000_综合_v10",
+        "overall_similarity": 0.1917,
+        "most_similar_dimensions": [
+          {
+            "feature": "分仓均匀度",
+            "diff": 0.1452
+          },
+          {
+            "feature": "亏损幅度",
+            "diff": 0.156
+          },
+          {
+            "feature": "买卖对称性",
+            "diff": 0.2179
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "ETF偏好",
+            "diff": 0.9791
+          },
+          {
+            "feature": "趋势偏好",
+            "diff": 0.8829
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 GZ2000_综合_v10 与您的投资风格匹配度 19.2%。您在 分仓均匀度、亏损幅度、买卖对称性 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "C": {
+      "top3": [
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.19841391555104726,
+          "rank": 1
+        },
+        {
+          "strategy": "HS300_综合_v10",
+          "similarity": 0.17755517709586338,
+          "rank": 2
+        },
+        {
+          "strategy": "CYB300_综合_v10",
+          "similarity": 0.15318555518576232,
+          "rank": 3
+        }
+      ],
+      "explanation": {
+        "customer_id": "C",
+        "matched_strategy": "GZ2000_综合_v10",
+        "overall_similarity": 0.1984,
+        "most_similar_dimensions": [
+          {
+            "feature": "换手率",
+            "diff": 0.1279
+          },
+          {
+            "feature": "分仓均匀度",
+            "diff": 0.1348
+          },
+          {
+            "feature": "亏损幅度",
+            "diff": 0.1935
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "趋势偏好",
+            "diff": 1.0412
+          },
+          {
+            "feature": "ETF偏好",
+            "diff": 0.8965
+          }
+        ],
+        "beta": 0.5,
+        "popup_text": "策略 GZ2000_综合_v10 与您的投资风格匹配度 19.8%。您在 换手率、分仓均匀度、亏损幅度 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    }
+  }
+}

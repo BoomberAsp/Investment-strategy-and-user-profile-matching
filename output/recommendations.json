@@ -1,0 +1,280 @@
+{
+  "euclidean": {
+    "A": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": 0.011646075798219774,
+          "rank": 4
+        }
+      ],
+      "explanation": {
+        "customer_id": "A",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": 0.0116,
+        "most_similar_dimensions": [
+          {
+            "feature": "trend_strength",
+            "diff": 0.0856
+          },
+          {
+            "feature": "daily_vol_annual",
+            "diff": 0.1066
+          },
+          {
+            "feature": "buy_sell_ratio",
+            "diff": 0.1191
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "hhi_concentration",
+            "diff": 0.9126
+          },
+          {
+            "feature": "avg_holding_period",
+            "diff": 0.875
+          }
+        ],
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格高度匹配（综合相似度 1.2%）。您在 trend_strength、daily_vol_annual、buy_sell_ratio 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "B": {
+      "top3": [
+        {
+          "strategy": "CYB300_综合_v10",
+          "similarity": 0.0012452969324563054,
+          "rank": 2
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.001240173043063852,
+          "rank": 3
+        },
+        {
+          "strategy": "集中_行业轮动_V251111701",
+          "similarity": 0.001154748159230286,
+          "rank": 5
+        }
+      ],
+      "explanation": {
+        "customer_id": "B",
+        "matched_strategy": "CYB300_综合_v10",
+        "overall_similarity": 0.0012,
+        "most_similar_dimensions": [
+          {
+            "feature": "positive_month_ratio",
+            "diff": 0.0476
+          },
+          {
+            "feature": "daily_vol_annual",
+            "diff": 0.1022
+          },
+          {
+            "feature": "avg_position_ratio",
+            "diff": 0.1339
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "annual_turnover",
+            "diff": 0.9417
+          },
+          {
+            "feature": "avg_holding_period",
+            "diff": 0.9091
+          }
+        ],
+        "popup_text": "策略 CYB300_综合_v10 与您的投资风格高度匹配（综合相似度 0.1%）。您在 positive_month_ratio、daily_vol_annual、avg_position_ratio 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "C": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": 0.007079235937816755,
+          "rank": 2
+        },
+        {
+          "strategy": "CYB300_综合_v10",
+          "similarity": 0.006462488119627687,
+          "rank": 3
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": 0.006341042478946725,
+          "rank": 4
+        }
+      ],
+      "explanation": {
+        "customer_id": "C",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": 0.0071,
+        "most_similar_dimensions": [
+          {
+            "feature": "buy_sell_ratio",
+            "diff": 0.0473
+          },
+          {
+            "feature": "avg_position_ratio",
+            "diff": 0.0955
+          },
+          {
+            "feature": "trades_per_year",
+            "diff": 0.1947
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "var_5pct",
+            "diff": 0.8469
+          },
+          {
+            "feature": "daily_vol_annual",
+            "diff": 0.7453
+          }
+        ],
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格高度匹配（综合相似度 0.7%）。您在 buy_sell_ratio、avg_position_ratio、trades_per_year 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    }
+  },
+  "cosine": {
+    "A": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": 0.9629840966413858,
+          "rank": 4
+        }
+      ],
+      "explanation": {
+        "customer_id": "A",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": 0.963,
+        "most_similar_dimensions": [
+          {
+            "feature": "trend_strength",
+            "diff": 0.0856
+          },
+          {
+            "feature": "daily_vol_annual",
+            "diff": 0.1066
+          },
+          {
+            "feature": "buy_sell_ratio",
+            "diff": 0.1191
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "hhi_concentration",
+            "diff": 0.9126
+          },
+          {
+            "feature": "avg_holding_period",
+            "diff": 0.875
+          }
+        ],
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格高度匹配（综合相似度 96.3%）。您在 trend_strength、daily_vol_annual、buy_sell_ratio 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "B": {
+      "top3": [
+        {
+          "strategy": "CYB300_综合_v10",
+          "similarity": -0.9332922490351505,
+          "rank": 2
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": -0.9345961171918616,
+          "rank": 3
+        },
+        {
+          "strategy": "宽指配置_V251216",
+          "similarity": -0.9949354926790466,
+          "rank": 5
+        }
+      ],
+      "explanation": {
+        "customer_id": "B",
+        "matched_strategy": "CYB300_综合_v10",
+        "overall_similarity": -0.9333,
+        "most_similar_dimensions": [
+          {
+            "feature": "positive_month_ratio",
+            "diff": 0.0476
+          },
+          {
+            "feature": "daily_vol_annual",
+            "diff": 0.1022
+          },
+          {
+            "feature": "avg_position_ratio",
+            "diff": 0.1339
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "annual_turnover",
+            "diff": 0.9417
+          },
+          {
+            "feature": "avg_holding_period",
+            "diff": 0.9091
+          }
+        ],
+        "popup_text": "策略 CYB300_综合_v10 与您的投资风格高度匹配（综合相似度 -93.3%）。您在 positive_month_ratio、daily_vol_annual、avg_position_ratio 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    },
+    "C": {
+      "top3": [
+        {
+          "strategy": "HX_朝花夕拾",
+          "similarity": -0.23142084187868617,
+          "rank": 1
+        },
+        {
+          "strategy": "宽指配置_V251216",
+          "similarity": -0.5429828312341834,
+          "rank": 4
+        },
+        {
+          "strategy": "GZ2000_综合_v10",
+          "similarity": -0.7443553116120842,
+          "rank": 5
+        }
+      ],
+      "explanation": {
+        "customer_id": "C",
+        "matched_strategy": "HX_朝花夕拾",
+        "overall_similarity": -0.2314,
+        "most_similar_dimensions": [
+          {
+            "feature": "buy_sell_ratio",
+            "diff": 0.0473
+          },
+          {
+            "feature": "avg_position_ratio",
+            "diff": 0.0955
+          },
+          {
+            "feature": "trades_per_year",
+            "diff": 0.1947
+          }
+        ],
+        "most_different_dimensions": [
+          {
+            "feature": "var_5pct",
+            "diff": 0.8469
+          },
+          {
+            "feature": "daily_vol_annual",
+            "diff": 0.7453
+          }
+        ],
+        "popup_text": "策略 HX_朝花夕拾 与您的投资风格高度匹配（综合相似度 -23.1%）。您在 buy_sell_ratio、avg_position_ratio、trades_per_year 方面与该策略风格最为接近，建议进一步了解该策略。"
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "user_id": "U_0001",
+  "beta": 0.7,
+  "risk_tolerance": 1,
+  "initial_capital": 3,
+  "features": {
+    "holding_period": 3,
+    "turnover_rate": 4.0,
+    "buy_sell_ratio": 1.1938957838511652,
+    "hhi_concentration": 0.04204848446833044,
+    "disposition_effect": 0.868341772466182,
+    "positive_trade_ratio": 0.4579391212776895,
+    "etf_ratio": 0.4331209706229647,
+    "avg_price_preference": 17.52638434740964,
+    "position_uniformity": 0.7834248504231726,
+    "avg_loss_magnitude": 0.03,
+    "vol_preference": 0.21039346283364518,
+    "trend_preference": 0.28871903100268803
+  },
+  "industry_vector": {},
+  "feature_momentum": {
+    "holding_period": 0.0,
+    "turnover_rate": 0.0,
+    "buy_sell_ratio": 0.0,
+    "hhi_concentration": 0.0,
+    "disposition_effect": 0.0,
+    "positive_trade_ratio": 0.0,
+    "etf_ratio": 0.0,
+    "avg_price_preference": 0.0,
+    "position_uniformity": 0.0,
+    "avg_loss_magnitude": 0.0,
+    "vol_preference": 0.0,
+    "trend_preference": 0.0
+  },
+  "decay_factor": 0.7,
+  "update_count": 0,
+  "confidence_level": "low",
+  "source": "questionnaire",
+  "last_updated": "2026-05-23T11:16:27.675700+00:00",
+  "questionnaire_scores": {},
+  "matching_backend": "statistical",
+  "history": [
+    {
+      "update": 0,
+      "features": {
+        "holding_period": 3,
+        "turnover_rate": 4.0,
+        "buy_sell_ratio": 1.1938957838511652,
+        "hhi_concentration": 0.04204848446833044,
+        "disposition_effect": 0.868341772466182,
+        "positive_trade_ratio": 0.4579391212776895,
+        "etf_ratio": 0.4331209706229647,
+        "avg_price_preference": 17.52638434740964,
+        "position_uniformity": 0.7834248504231726,
+        "avg_loss_magnitude": 0.03,
+        "vol_preference": 0.21039346283364518,
+        "trend_preference": 0.28871903100268803
+      },
+      "timestamp": "2026-05-23T11:16:27.675700+00:00"
+    }
+  ]
+}
