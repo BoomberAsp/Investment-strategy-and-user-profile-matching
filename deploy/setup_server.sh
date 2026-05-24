@@ -17,7 +17,7 @@ echo "=========================================="
 # 参数配置（可通过环境变量覆盖）
 # ──────────────────────────────────────────────
 DOMAIN="${DOMAIN:-oneweblog.cn}"
-PROJECT_DIR="${PROJECT_DIR:-/opt/investment-app}"
+PROJECT_DIR="${PROJECT_DIR:-/root/vdb/investment-app}"
 STREAMLIT_PORT="${STREAMLIT_PORT:-8501}"
 PYTHON_VER="${PYTHON_VER:-3.12}"
 
@@ -33,7 +33,7 @@ fi
 # Step 1: 安装系统依赖
 # ──────────────────────────────────────────────
 echo ""
-echo "[1/7] Installing system dependencies..."
+echo "[1/5] Installing system dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt update -qq
 apt install -y --no-install-recommends \
@@ -53,7 +53,7 @@ echo "  -> System dependencies installed."
 # Step 2: 中文字体配置
 # ──────────────────────────────────────────────
 echo ""
-echo "[2/7] Setting up Chinese fonts..."
+echo "[2/5] Setting up Chinese fonts..."
 fc-cache -fv 2>/dev/null
 
 # 创建 matplotlib 字体缓存目录（确保中文显示）
@@ -64,62 +64,49 @@ echo "  -> Chinese fonts configured."
 # Step 3: 创建项目目录（如果不存在）
 # ──────────────────────────────────────────────
 echo ""
-echo "[3/7] Preparing project directory: $PROJECT_DIR"
+echo "[3/5] Preparing project directory: $PROJECT_DIR"
 mkdir -p "$PROJECT_DIR"
 
 # ──────────────────────────────────────────────
-# Step 4: 创建 Python 虚拟环境
+# Step 4: 检查虚拟环境（已存在的跳过）
 # ──────────────────────────────────────────────
 echo ""
-echo "[4/7] Creating Python virtual environment..."
+echo "[4/5] Checking Python virtual environment..."
 cd "$PROJECT_DIR"
 
-# 如果已有 venv 则跳过
-if [ ! -d "venv" ]; then
-    "python${PYTHON_VER}" -m venv venv
-    echo "  -> Virtual environment created."
+# Auto-detect existing venv directory
+if [ -d "InvestmentMatching" ] && [ -f "InvestmentMatching/bin/streamlit" ]; then
+    VENV_DIR="InvestmentMatching"
+elif [ -d "venv" ] && [ -f "venv/bin/streamlit" ]; then
+    VENV_DIR="venv"
 else
+    VENV_DIR=""
+fi
+
+if [ -n "$VENV_DIR" ]; then
     echo "  -> Virtual environment already exists, skipping."
-fi
-
-source venv/bin/activate
-pip install --upgrade pip -q
-
-# ──────────────────────────────────────────────
-# Step 5: 安装 Python 依赖
-# ──────────────────────────────────────────────
-echo ""
-echo "[5/7] Installing Python dependencies..."
-
-REQ_FILE="$PROJECT_DIR/requirements.txt"
-if [ ! -f "$REQ_FILE" ]; then
-    echo "  ERROR: requirements.txt not found at $REQ_FILE"
-    echo "  Please copy your project files to $PROJECT_DIR first."
-    exit 1
-fi
-
-# 检测 GPU 并安装对应版本的 torch
-if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
-    echo "  -> GPU detected, installing torch with CUDA..."
-    pip install torch --index-url https://download.pytorch.org/whl/cu121 -q
 else
-    echo "  -> No GPU detected, installing CPU-only torch..."
-    pip install torch --index-url https://download.pytorch.org/whl/cpu -q
+    echo "  -> venv not found, creating..."
+    "python${PYTHON_VER}" -m venv venv
+    source "${PROJECT_DIR}/venv/bin/activate"
+    pip install --upgrade pip -q
+    if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+        pip install torch --index-url https://download.pytorch.org/whl/cu121 -q
+    else
+        pip install torch --index-url https://download.pytorch.org/whl/cpu -q
+    fi
+    grep -v '^torch' requirements.txt | pip install -r /dev/stdin -q
+    echo "  -> Virtual environment created and dependencies installed."
 fi
-
-# 安装其余依赖（跳过已在上面安装的 torch）
-grep -v '^torch' "$REQ_FILE" | pip install -r /dev/stdin -q
-
-echo "  -> Python dependencies installed."
 
 # ──────────────────────────────────────────────
 # Step 6: Nginx 反向代理配置
 # ──────────────────────────────────────────────
 echo ""
-echo "[6/7] Configuring Nginx reverse proxy..."
+echo "[5/5] Configuring Nginx reverse proxy..."
 
 NGINX_CONF="/etc/nginx/sites-available/investment-app"
-cat > "$NGINX_CONF" <<NGINX_EOF
+cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -137,7 +124,7 @@ server {
         proxy_read_timeout 86400;
     }
 }
-NGINX_CONF_EOF
+EOF
 
 # 启用站点配置
 ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/investment-app
@@ -151,11 +138,11 @@ echo "  -> Nginx configured for ${DOMAIN}"
 # Step 7: Supervisor 进程管理
 # ──────────────────────────────────────────────
 echo ""
-echo "[7/7] Configuring supervisor service..."
+echo "  Configuring supervisor service..."
 
 cat > /etc/supervisor/conf.d/investment-app.conf <<SUPERVISOR_EOF
 [program:investment-app]
-command=${PROJECT_DIR}/venv/bin/streamlit run ${PROJECT_DIR}/app.py \
+command=${PROJECT_DIR}/${VENV_DIR:-venv}/bin/streamlit run ${PROJECT_DIR}/app.py \
     --server.address 0.0.0.0 \
     --server.port ${STREAMLIT_PORT} \
     --server.headless true
@@ -192,7 +179,7 @@ echo ""
 echo "  2. Edit $PROJECT_DIR/DLMethod/.env and set DEEPSEEK_API_KEY"
 echo ""
 echo "  3. Run pipeline (generates precomputed data):"
-echo "     cd $PROJECT_DIR && source venv/bin/activate && python pipeline.py"
+echo "     cd $PROJECT_DIR && source \${VENV_DIR:-venv}/bin/activate && python pipeline.py"
 echo ""
 echo "  4. Restart app:"
 echo "     supervisorctl restart investment-app"
