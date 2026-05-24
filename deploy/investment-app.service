@@ -1,0 +1,22 @@
+[Unit]
+Description=Investment Strategy Streamlit App
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/investment-app
+ExecStart=/opt/investment-app/venv/bin/streamlit run /opt/investment-app/app.py \
+    --server.address 0.0.0.0 \
+    --server.port 8501 \
+    --server.headless true
+Restart=always
+RestartSec=5
+Environment=HOME=/opt/investment-app
+
+# 日志
+StandardOutput=append:/var/log/investment-app.log
+StandardError=append:/var/log/investment-app-error.log
+
+[Install]
+WantedBy=multi-user.target
