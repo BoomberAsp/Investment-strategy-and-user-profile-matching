@@ -43,8 +43,12 @@ class RecommendationService:
         if backend is None:
             raise ValueError(f"Backend '{backend_name}' not found. Available: {self.registry.list_available()}")
 
+        # Build features dict with _user_id for backends that need it
+        features = dict(user_features)
+        features["_user_id"] = user_id
+
         result = backend.predict(
-            user_features=user_features,
+            user_features=features,
             beta=profile.beta,
             top_n=top_n,
             industry_vector=profile.industry_vector if profile.industry_vector else None,
