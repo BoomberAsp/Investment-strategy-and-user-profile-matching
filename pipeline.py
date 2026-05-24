@@ -39,15 +39,17 @@ BASE_DIR = Path(__file__).parent
 OUTPUT_DIR = BASE_DIR / 'output'
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+STATS_DATA_DIR = BASE_DIR / 'stats_data'
+
 STRATEGY_DATA_DIR = (
-    BASE_DIR / '净值_交易_资金及字段说明（相关性数据分析）' / 'products_export_20260518_163122'
+    STATS_DATA_DIR / '净值_交易_资金及字段说明（相关性数据分析）' / 'products_export_20260518_163122'
 )
-PERF_FILE_1 = BASE_DIR / '量化策略绩效-1.xlsx'
-PERF_FILE_2 = BASE_DIR / '量化策略绩效-2.xlsx'
+PERF_FILE_1 = STATS_DATA_DIR / '量化策略绩效-1.xlsx'
+PERF_FILE_2 = STATS_DATA_DIR / '量化策略绩效-2.xlsx'
 USER_FILES = {
-    'A': BASE_DIR / '模拟账户A的记录.xlsx',
-    'B': BASE_DIR / '模拟账户B的记录.xlsx',
-    'C': BASE_DIR / '模拟账户C的记录.xlsx',
+    'A': STATS_DATA_DIR / '模拟账户A的记录.xlsx',
+    'B': STATS_DATA_DIR / '模拟账户B的记录.xlsx',
+    'C': STATS_DATA_DIR / '模拟账户C的记录.xlsx',
 }
 
 # beta 超参数: 控制行为特征 vs 非行为特征的权重
@@ -172,7 +174,7 @@ def parse_user_trades(user_df):
     qty_col = user_df.columns[5]
 
     trades = pd.DataFrame({
-        'trade_date': user_df[date_col],
+        'trade_date': pd.to_datetime(user_df[date_col], format='%Y%m%d', errors='coerce'),
         'action_type': user_df[action_col],
         'symbol': user_df[sym_col].astype(str),
         'price': user_df[price_col],
@@ -563,6 +565,8 @@ def apply_beta_weighting(feature_dict, beta):
     """
     weighted = {}
     for fname, fval in feature_dict.items():
+        if fname not in MATCH_FEATURES:
+            continue  # skip meta keys like _user_id
         if FEATURE_GROUPS.get(fname) == 'behavior':
             weighted[fname] = fval * beta
         else:

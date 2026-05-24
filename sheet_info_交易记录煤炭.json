@@ -1,0 +1,29 @@
+{
+  "sheet": "交易记录煤炭",
+  "columns": [
+    "trade_time",
+    "order_fill_time",
+    "btype",
+    "symbol",
+    "order_price",
+    "order_volume",
+    "side",
+    "volume",
+    "vwap",
+    "amount",
+    "fee",
+    "net_amount",
+    "cash_balance",
+    "posi_balance",
+    "posi_vwap",
+    "multiplier",
+    "margin_ratio",
+    "margin_change_amount"
+  ],
+  "shape": [
+    281,
+    18
+  ],
+  "sample": [
+    {
+      "trade_time": 
