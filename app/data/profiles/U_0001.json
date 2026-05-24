@@ -4,39 +4,39 @@
   "risk_tolerance": 1,
   "initial_capital": 3,
   "features": {
-    "holding_period": 3,
-    "turnover_rate": 4.0,
-    "buy_sell_ratio": 1.1938957838511652,
-    "hhi_concentration": 0.04204848446833044,
-    "disposition_effect": 0.868341772466182,
-    "positive_trade_ratio": 0.4579391212776895,
-    "etf_ratio": 0.4331209706229647,
-    "avg_price_preference": 17.52638434740964,
-    "position_uniformity": 0.7834248504231726,
-    "avg_loss_magnitude": 0.03,
-    "vol_preference": 0.21039346283364518,
-    "trend_preference": 0.28871903100268803
+    "holding_period": 12.555,
+    "turnover_rate": 3.273954248366013,
+    "buy_sell_ratio": 1.1891918068270417,
+    "hhi_concentration": 0.06699201964706145,
+    "disposition_effect": 1.0656151268352767,
+    "positive_trade_ratio": 0.4941889378340195,
+    "etf_ratio": 0.3486623813514866,
+    "avg_price_preference": 15.801308691003342,
+    "position_uniformity": 0.762359839668572,
+    "avg_loss_magnitude": 0.03455518836200848,
+    "vol_preference": 0.22821443398209246,
+    "trend_preference": 0.22477908463820917
   },
   "industry_vector": {},
   "feature_momentum": {
-    "holding_period": 0.0,
-    "turnover_rate": 0.0,
-    "buy_sell_ratio": 0.0,
-    "hhi_concentration": 0.0,
-    "disposition_effect": 0.0,
-    "positive_trade_ratio": 0.0,
-    "etf_ratio": 0.0,
-    "avg_price_preference": 0.0,
-    "position_uniformity": 0.0,
-    "avg_loss_magnitude": 0.0,
-    "vol_preference": 0.0,
-    "trend_preference": 0.0
+    "holding_period": 31.85,
+    "turnover_rate": -2.420152505446623,
+    "buy_sell_ratio": -0.01567992341374539,
+    "hhi_concentration": 0.08314511726243666,
+    "disposition_effect": 0.6575778478969818,
+    "positive_trade_ratio": 0.12083272185443336,
+    "etf_ratio": -0.281528630904927,
+    "avg_price_preference": -5.75025218802099,
+    "position_uniformity": -0.07021670251533511,
+    "avg_loss_magnitude": 0.01518396120669493,
+    "vol_preference": 0.05940323716149087,
+    "trend_preference": -0.21313315454826284
   },
   "decay_factor": 0.7,
-  "update_count": 0,
+  "update_count": 1,
   "confidence_level": "low",
-  "source": "questionnaire",
-  "last_updated": "2026-05-23T11:16:27.675700+00:00",
+  "source": "hybrid",
+  "last_updated": "2026-05-24T03:13:08.133423+00:00",
   "questionnaire_scores": {},
   "matching_backend": "statistical",
   "history": [
@@ -57,6 +57,24 @@
         "trend_preference": 0.28871903100268803
       },
       "timestamp": "2026-05-23T11:16:27.675700+00:00"
+    },
+    {
+      "update": 1,
+      "features": {
+        "holding_period": 12.555,
+        "turnover_rate": 3.273954248366013,
+        "buy_sell_ratio": 1.1891918068270417,
+        "hhi_concentration": 0.06699201964706145,
+        "disposition_effect": 1.0656151268352767,
+        "positive_trade_ratio": 0.4941889378340195,
+        "etf_ratio": 0.3486623813514866,
+        "avg_price_preference": 15.801308691003342,
+        "position_uniformity": 0.762359839668572,
+        "avg_loss_magnitude": 0.03455518836200848,
+        "vol_preference": 0.22821443398209246,
+        "trend_preference": 0.22477908463820917
+      },
+      "timestamp": "2026-05-24T03:13:08.133423+00:00"
     }
   ]
 }
