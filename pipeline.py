@@ -39,15 +39,17 @@ BASE_DIR = Path(__file__).parent
 OUTPUT_DIR = BASE_DIR / 'output'
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+STATS_DATA_DIR = BASE_DIR / 'stats_data'
+
 STRATEGY_DATA_DIR = (
-    BASE_DIR / '净值_交易_资金及字段说明（相关性数据分析）' / 'products_export_20260518_163122'
+    STATS_DATA_DIR / '净值_交易_资金及字段说明（相关性数据分析）' / 'products_export_20260518_163122'
 )
-PERF_FILE_1 = BASE_DIR / '量化策略绩效-1.xlsx'
-PERF_FILE_2 = BASE_DIR / '量化策略绩效-2.xlsx'
+PERF_FILE_1 = STATS_DATA_DIR / '量化策略绩效-1.xlsx'
+PERF_FILE_2 = STATS_DATA_DIR / '量化策略绩效-2.xlsx'
 USER_FILES = {
-    'A': BASE_DIR / '模拟账户A的记录.xlsx',
-    'B': BASE_DIR / '模拟账户B的记录.xlsx',
-    'C': BASE_DIR / '模拟账户C的记录.xlsx',
+    'A': STATS_DATA_DIR / '模拟账户A的记录.xlsx',
+    'B': STATS_DATA_DIR / '模拟账户B的记录.xlsx',
+    'C': STATS_DATA_DIR / '模拟账户C的记录.xlsx',
 }
 
 # beta 超参数: 控制行为特征 vs 非行为特征的权重

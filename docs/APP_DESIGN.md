@@ -56,7 +56,10 @@ Investment-strategy-and-user-profile-matching/
 │   │       └── {user_id}_{level}.json
 │   └── config.py                        # 全局配置（路径、超参数等）
 ├── app.py                               # Streamlit 主入口
-├── report.md                            # 数据分析报告
+├── docs/
+│   ├── report.md                        # 数据分析报告
+│   ├── APP_DESIGN.md                    # 本文件
+│   └── DATA_ANALYSIS_WORKFLOW.md        # 数据分析工作流
 ├── README.md                            # 项目说明
 └── requirements.txt                     # 新增: streamlit 等依赖
 ```
@@ -340,8 +343,6 @@ class FusionBackend(MatchingBackend):
 ```
 
 ### 4.5 后端注册与切换
-
-### 4.6 后端注册与切换
 
 ```python
 class BackendRegistry:

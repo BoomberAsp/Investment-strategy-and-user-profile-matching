@@ -1,6 +1,6 @@
 {
   "user_id": "U_0001",
-  "beta": 0.7,
+  "beta": 0.25,
   "risk_tolerance": 1,
   "initial_capital": 3,
   "features": {

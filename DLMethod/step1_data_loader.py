@@ -6,6 +6,10 @@ Step 1: 数据加载与清洗
 import pandas as pd
 import numpy as np
 import re
+from pathlib import Path
+
+# 数据目录（统一放在项目根目录下的 stats_data/）
+STATS_DATA_DIR = Path(__file__).parent.parent / 'stats_data'
 
 # ============================================================
 # 1. 加载策略交易记录
@@ -13,8 +17,8 @@ import re
 
 def load_strategy_from_file1():
     """加载量化策略绩效-1.xlsx中的12个策略"""
-    xls = pd.ExcelFile('量化策略绩效-1.xlsx')
-    summary = pd.read_excel('量化策略绩效-1.xlsx', sheet_name='总表')
+    xls = pd.ExcelFile(STATS_DATA_DIR / '量化策略绩效-1.xlsx')
+    summary = pd.read_excel(STATS_DATA_DIR / '量化策略绩效-1.xlsx', sheet_name='总表')
 
     # sheet名 → 策略名映射
     sheet_to_strategy = {
@@ -34,7 +38,7 @@ def load_strategy_from_file1():
 
     all_records = []
     for sheet_name, strategy_name in sheet_to_strategy.items():
-        df = pd.read_excel('量化策略绩效-1.xlsx', sheet_name=sheet_name)
+        df = pd.read_excel(STATS_DATA_DIR / '量化策略绩效-1.xlsx', sheet_name=sheet_name)
         df['strategy_name'] = strategy_name
         df['source'] = '绩效1'
         all_records.append(df)
@@ -44,7 +48,7 @@ def load_strategy_from_file1():
 
 def load_strategy_from_file2():
     """加载量化策略绩效-2.xlsx中有交易记录的22个策略"""
-    xls = pd.ExcelFile('量化策略绩效-2.xlsx')
+    xls = pd.ExcelFile(STATS_DATA_DIR / '量化策略绩效-2.xlsx')
 
     # sheet名 → 策略名映射 (22个有交易记录的)
     sheet_to_strategy = {
@@ -74,7 +78,7 @@ def load_strategy_from_file2():
 
     all_records = []
     for sheet_name, strategy_name in sheet_to_strategy.items():
-        df = pd.read_excel('量化策略绩效-2.xlsx', sheet_name=sheet_name)
+        df = pd.read_excel(STATS_DATA_DIR / '量化策略绩效-2.xlsx', sheet_name=sheet_name)
         df['strategy_name'] = strategy_name
         df['source'] = '绩效2'
         all_records.append(df)
@@ -121,9 +125,9 @@ def load_strategy_from_csv(filepath, strategy_name, source_label):
 def load_account(account_id):
     """加载模拟账户A/B/C"""
     file_map = {
-        'A': '模拟账户A的记录.xlsx',
-        'B': '模拟账户B的记录.xlsx',
-        'C': '模拟账户C的记录.xlsx',
+        'A': STATS_DATA_DIR / '模拟账户A的记录.xlsx',
+        'B': STATS_DATA_DIR / '模拟账户B的记录.xlsx',
+        'C': STATS_DATA_DIR / '模拟账户C的记录.xlsx',
     }
     df = pd.read_excel(file_map[account_id])
 
@@ -231,9 +235,9 @@ def main():
 
     # 加载新增CSV格式策略 (3个)
     print("加载新增CSV策略...")
-    s3 = load_strategy_from_csv('带ETF的策略1.csv', '国证2000ETF增强', '新增ETF')
-    s4 = load_strategy_from_csv('带ETF策略2.csv', '创业板300ETF增强', '新增ETF')
-    s5 = load_strategy_from_csv('朝花夕拾策略.csv', '朝花夕拾策略', '新增择时')
+    s3 = load_strategy_from_csv(str(STATS_DATA_DIR / '带ETF的策略1.csv'), '国证2000ETF增强', '新增ETF')
+    s4 = load_strategy_from_csv(str(STATS_DATA_DIR / '带ETF策略2.csv'), '创业板300ETF增强', '新增ETF')
+    s5 = load_strategy_from_csv(str(STATS_DATA_DIR / '朝花夕拾策略.csv'), '朝花夕拾策略', '新增择时')
     strategies = pd.concat([strategies, s3, s4, s5], ignore_index=True)
 
     # 加载账户

@@ -102,42 +102,60 @@ def init_services():
 
 
 def _load_strategy_data(extractor):
-    """加载策略特征和净值数据"""
+    """加载策略特征和净值数据（目录 + Excel 双源）"""
     from app.config import STRATEGY_DATA_DIR
     import pandas as pd
 
     strategy_features = {}
     strategy_nav = {}
 
-    if not STRATEGY_DATA_DIR.exists():
-        return strategy_features, strategy_nav
+    # --- 源1: 目录格式（原7种策略）---
+    if STRATEGY_DATA_DIR.exists():
+        for dir_path in sorted(STRATEGY_DATA_DIR.iterdir()):
+            if not dir_path.is_dir():
+                continue
+            strategy_id = dir_path.name
 
-    for dir_path in sorted(STRATEGY_DATA_DIR.iterdir()):
-        if not dir_path.is_dir():
-            continue
-        strategy_id = dir_path.name
+            dv_file = dir_path / "daily_value.csv"
+            if dv_file.exists():
+                nav_df = pd.read_csv(dv_file)
+                nav_df["date"] = pd.to_datetime(nav_df["date"])
+                nav_df = nav_df.sort_values("date").reset_index(drop=True)
+                strategy_nav[strategy_id] = nav_df
 
-        # 加载净值
-        dv_file = dir_path / "daily_value.csv"
-        if dv_file.exists():
-            nav_df = pd.read_csv(dv_file)
-            nav_df["date"] = pd.to_datetime(nav_df["date"])
-            nav_df = nav_df.sort_values("date").reset_index(drop=True)
-            strategy_nav[strategy_id] = nav_df
+            trades_file = dir_path / "trades.csv"
+            if trades_file.exists() and strategy_id in strategy_nav:
+                trades_df = pd.read_csv(trades_file)
+                trades_df["trade_date"] = pd.to_datetime(trades_df["trade_date"])
+                try:
+                    features = extractor.extract_strategy_features(
+                        strategy_nav[strategy_id], trades_df
+                    )
+                    strategy_features[strategy_id] = features
+                except Exception:
+                    pass
 
-        # 加载交易
-        trades_file = dir_path / "trades.csv"
-        if trades_file.exists() and strategy_id in strategy_nav:
-            trades_df = pd.read_csv(trades_file)
-            trades_df["trade_date"] = pd.to_datetime(trades_df["trade_date"])
-            try:
-                features = extractor.extract_strategy_features(
-                    strategy_nav[strategy_id], trades_df
-                )
-                strategy_features[strategy_id] = features
-            except Exception:
-                pass
+    # --- 源2: stats_data Excel 文件（37种策略）---
+    try:
+        from app.services.excel_strategy_loader import load_excel_strategies
+        from app.config import STATS_DATA_DIR as _stats_dir
+        excel_trades, excel_nav = load_excel_strategies(_stats_dir)
+        for sid, trades_df in excel_trades.items():
+            if sid in strategy_nav or sid in excel_nav:
+                # 避免重名，优先使用 Excel 的 NAV
+                if sid not in strategy_nav:
+                    strategy_nav[sid] = excel_nav.get(sid, pd.DataFrame())
+                try:
+                    features = extractor.extract_strategy_features(
+                        excel_nav.get(sid, pd.DataFrame()), trades_df
+                    )
+                    strategy_features[sid] = features
+                except Exception as e:
+                    print(f"[excel_loader] Failed to extract features for {sid}: {e}")
+    except Exception as e:
+        print(f"[excel_loader] Failed to load Excel strategies: {e}")
 
+    print(f"[init] Total strategies loaded: {len(strategy_features)}")
     return strategy_features, strategy_nav
 
 
