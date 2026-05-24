@@ -83,13 +83,13 @@ def _standardize_raw_excel(df: pd.DataFrame, strategy_name: str) -> pd.DataFrame
 
     # 用 btype 判断买卖方向
     if 'btype' in df.columns:
-        btype = df['btype'].astype(str)
+        btype = df['btype'].fillna('').astype(str)
         mapped_side = btype.apply(
             lambda x: 'BUY' if '买入' in x else ('SELL' if '卖出' in x else None)
         )
     else:
         # 回退: 用 side 列
-        raw_side = df['side'].astype(str)
+        raw_side = df['side'].fillna('').astype(str)
         mapped_side = raw_side.apply(
             lambda x: 'BUY' if '买' in x else ('SELL' if '卖' in x else None)
         )
