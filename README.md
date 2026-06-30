@@ -107,6 +107,22 @@ python generate_simulated_data.py
 
 生成 500 个模拟策略 + 200 个模拟用户的交易数据，输出至 `output/simulated_data/`。
 
+### 5. 补充缺失行情数据（可选）
+
+推荐页的收益曲线会从 `market_data_full_raw/daily_by_symbol/` 按需读取日度行情。若新增策略或用户上传记录包含新的股票代码，可运行：
+
+```bash
+python scripts/fetch_missing_market_data.py
+```
+
+脚本会扫描内置策略池和模拟账户，下载缺失代码的不复权日线 CSV。若需要把本地上传用户的交易记录也纳入扫描：
+
+```bash
+python scripts/fetch_missing_market_data.py --include-app-uploads
+```
+
+Baostock 对部分可转债、申购代码、B 股可能返回空数据；这些代码在收益曲线中会按成交价固定估值，并在页面的数据质量提示中标记为近似结果。
+
 ---
 
 ## 项目结构
@@ -119,6 +135,12 @@ Investment-strategy-and-user-profile-matching/
 ├── generate_simulated_data.py           # 模拟数据生成器（500策略+200用户）
 │
 ├── app.py                               # Streamlit 网页应用主入口
+│
+├── market_data_full_raw/                # 日度行情数据（收益曲线按需懒加载）
+│   └── daily_by_symbol/                 # 每个证券代码一个 CSV
+│
+├── scripts/
+│   └── fetch_missing_market_data.py     # 下载缺失日度行情数据
 │
 ├── stats_data/                          # 源数据（统一存放）
 │   ├── 量化策略绩效-1.xlsx              # DLMethod: 12 策略交易记录
@@ -145,6 +167,8 @@ Investment-strategy-and-user-profile-matching/
 │   │   ├── storage.py                   # JSON 文件存储引擎（含 filelock）
 │   │   ├── questionnaire.py             # 三级问卷定义 + 评分引擎
 │   │   ├── feature_extractor.py         # 从 pipeline.py 抽象出的特征提取
+│   │   ├── price_data.py                # 行情 CSV 懒加载服务
+│   │   ├── trend_service.py             # 客户/策略收益曲线计算 + Plotly 图表
 │   │   ├── profile.py                   # 画像管理 + EMA 动量更新
 │   │   ├── matching_backend.py          # 统一匹配引擎接口（抽象基类）
 │   │   ├── recommendation.py            # 推荐调度器
@@ -215,6 +239,27 @@ Investment-strategy-and-user-profile-matching/
 - 用户 B：1727 笔交易，超短线高频风格（持仓 2 天）
 - 用户 C：285 笔交易，短线中频风格（胜率 67%）
 
+### 日度行情数据
+
+`market_data_full_raw/daily_by_symbol/` 存放收益曲线所需的不复权日线行情，每个证券代码一个 CSV。系统不会在启动时全量读取该目录，而是在用户打开推荐页并选择策略曲线时按涉及的证券代码懒加载。
+
+收益曲线计算口径：
+
+```
+totalAsset_t = cash_t + Σ(position_i_t × close_i_t)
+cumulativeReturn_t = (totalAsset_t / initialAsset - 1) × 100
+```
+
+当某些代码缺少日线行情时，系统使用首次成交价固定估值，并把该曲线标记为 `partial_missing_prices`。因此推荐页图表优先保证可展示，同时通过“数据质量提示”说明哪些代码使用了近似估值。
+
+### 收益曲线迁移说明
+
+本分支保留目标项目原有 Streamlit 架构、推荐逻辑、登录、问卷、上传和画像更新流程，只迁入收益曲线相关能力；没有迁入来源项目的 Next.js/React/Recharts 前端。
+
+推荐页新增的收益曲线区域默认展示 Top1 推荐策略，用户可以手动勾选 TopN 中任意策略进行对比。客户曲线来自当前登录用户上传的交易记录；策略曲线使用全量日度行情按 `cash + position * close` 逐日重算，不直接复用 `strategy_nav`。`strategy_nav` 仍保留给原有推荐摘要、收益特征和稳定性分析逻辑使用。
+
+本次补充行情后，内置策略和模拟账户中仍有少量代码 Baostock 返回空数据：`123254`, `123255`, `127110`, `200025`, `200028`, `200541`, `200550`, `732210`, `732406`, `900912`, `900913`, `900922`, `900929`, `900942`, `900945`, `900948`。这些代码主要来自可转债、申购代码和 B 股，收益曲线会按成交价固定估值并在页面提示中标记。
+
 ---
 
 ## 网页应用功能
@@ -241,7 +286,7 @@ Investment-strategy-and-user-profile-matching/
 | **完善问卷** | 三级渐进问卷（L1 必填 5 题、L2 可选 8 题、L3 可选 10 题） |
 | **上传交易数据** | 支持 Excel/CSV，可选择分析时间窗口（全量/30/60/120 天） |
 | **我的画像** | 12 维特征雷达图、画像变化轨迹、行业分布预览 |
-| **推荐策略** | Top-3 推荐 + 维度级归因 + 弹窗话术预览 + 双源排名 |
+| **推荐策略** | Top-3 推荐 + 维度级归因 + 弹窗话术预览 + 双源排名 + 收益曲线对比 |
 | **匹配稳定性** | 多窗口推荐对比 + 多后端对比 + 趋势图 + 一致性结论 |
 | **设置** | β 手动调整、数据导出/清除、后端切换、融合权重 α 调节 |
 
