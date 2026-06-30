@@ -44,7 +44,7 @@ def init_services():
     extractor = FeatureExtractor()
 
     # 加载策略数据
-    strategy_features, strategy_nav = _load_strategy_data(extractor)
+    strategy_features, strategy_nav, strategy_trades = _load_strategy_data(extractor)
 
     # 问卷服务
     feature_means = extractor.get_feature_means(strategy_features)
@@ -97,6 +97,7 @@ def init_services():
         "popup_gen": popup_gen,
         "strategy_features": strategy_features,
         "strategy_nav": strategy_nav,
+        "strategy_trades": strategy_trades,
         "nav_info": nav_info,
     }
 
@@ -108,6 +109,7 @@ def _load_strategy_data(extractor):
 
     strategy_features = {}
     strategy_nav = {}
+    strategy_trades = {}
 
     # --- 源1: 目录格式（原7种策略）---
     if STRATEGY_DATA_DIR.exists():
@@ -127,6 +129,7 @@ def _load_strategy_data(extractor):
             if trades_file.exists() and strategy_id in strategy_nav:
                 trades_df = pd.read_csv(trades_file)
                 trades_df["trade_date"] = pd.to_datetime(trades_df["trade_date"])
+                strategy_trades[strategy_id] = trades_df
                 try:
                     features = extractor.extract_strategy_features(
                         strategy_nav[strategy_id], trades_df
@@ -140,6 +143,7 @@ def _load_strategy_data(extractor):
         from app.services.excel_strategy_loader import load_excel_strategies
         from app.config import STATS_DATA_DIR as _stats_dir
         excel_trades, excel_nav = load_excel_strategies(_stats_dir)
+        strategy_trades.update(excel_trades)
         for sid, trades_df in excel_trades.items():
             if sid in strategy_nav or sid in excel_nav:
                 # 避免重名，优先使用 Excel 的 NAV
@@ -156,7 +160,7 @@ def _load_strategy_data(extractor):
         print(f"[excel_loader] Failed to load Excel strategies: {e}")
 
     print(f"[init] Total strategies loaded: {len(strategy_features)}")
-    return strategy_features, strategy_nav
+    return strategy_features, strategy_nav, strategy_trades
 
 
 def _compute_strategy_nav_info(strategy_nav: dict) -> dict:
@@ -716,6 +720,125 @@ def _display_backend_label(backend_name: str) -> str:
     return _BACKEND_DISPLAY.get(backend_name, backend_name)
 
 
+@st.cache_data(show_spinner=False)
+def _cached_strategy_trend(strategy_name: str, _trades_df: pd.DataFrame):
+    from app.services.trend_service import compute_strategy_trend
+
+    return compute_strategy_trend(strategy_name, _trades_df)
+
+
+@st.cache_data(show_spinner=False)
+def _cached_user_trend(
+    user_id: str,
+    upload_fingerprint: tuple[str, ...],
+    initial_capital: float,
+    _trades_df: pd.DataFrame,
+):
+    from app.services.trend_service import compute_user_trend
+
+    return compute_user_trend(user_id, _trades_df, initial_capital=initial_capital)
+
+
+def _format_return(value) -> str:
+    if value is None:
+        return "—"
+    try:
+        return f"{float(value):+.2f}%"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _render_trend_curves(user, profile, recommendations: list[dict]):
+    from app.services.trend_service import build_trend_plot
+
+    st.divider()
+    st.subheader("收益曲线")
+
+    strategy_names = [rec["strategy"] for rec in recommendations if rec.get("strategy")]
+    if not strategy_names:
+        st.info("暂无可展示的推荐策略曲线。")
+        return
+
+    default_selection = strategy_names[:1]
+    selected_strategies = st.multiselect(
+        "选择要显示的推荐策略",
+        options=strategy_names,
+        default=default_selection,
+        help="默认显示 Top1，可勾选 TopN 中任意策略同时对比。",
+    )
+
+    if not selected_strategies:
+        st.info("请至少选择一个策略以绘制收益曲线。")
+        return
+
+    strategy_trends = {}
+    rows = []
+    warning_blocks: list[tuple[str, list[str]]] = []
+
+    with st.spinner("正在计算收益曲线..."):
+        for strategy_name in selected_strategies:
+            trades_df = services["strategy_trades"].get(strategy_name)
+            if trades_df is None or trades_df.empty:
+                warning_blocks.append((strategy_name, ["该策略缺少可用于行情重算的交易记录。"]))
+                continue
+
+            result = _cached_strategy_trend(strategy_name, trades_df)
+            strategy_trends[strategy_name] = result
+            meta = result.get("meta", {})
+            rows.append({
+                "对象": strategy_name,
+                "最终收益": _format_return(meta.get("finalReturn")),
+                "行情覆盖率": f"{meta.get('coverageRate', 0):.1f}%",
+                "数据质量": meta.get("dataQuality", "unknown"),
+                "区间": f"{meta.get('startDate') or '—'} 至 {meta.get('endDate') or '—'}",
+            })
+            if meta.get("warnings"):
+                warning_blocks.append((strategy_name, meta["warnings"]))
+
+        user_trend = None
+        user_trades = services["storage"].load_trades(user.user_id)
+        if user_trades is None or user_trades.empty:
+            st.info("当前用户尚未上传交易记录；已仅展示策略收益曲线。")
+        else:
+            uploads = services["storage"].list_trade_uploads(user.user_id)
+            fingerprint = tuple(upload["filename"] for upload in uploads)
+            user_trend = _cached_user_trend(
+                user.user_id,
+                fingerprint,
+                float(profile.initial_capital or 0.0),
+                user_trades,
+            )
+            meta = user_trend.get("meta", {})
+            rows.insert(0, {
+                "对象": "我的账户",
+                "最终收益": _format_return(meta.get("finalReturn")),
+                "行情覆盖率": f"{meta.get('coverageRate', 0):.1f}%",
+                "数据质量": meta.get("dataQuality", "unknown"),
+                "区间": f"{meta.get('startDate') or '—'} 至 {meta.get('endDate') or '—'}",
+            })
+            if meta.get("warnings"):
+                warning_blocks.insert(0, ("我的账户", meta["warnings"]))
+
+    has_curve = bool(user_trend and user_trend.get("trend")) or any(
+        result.get("trend") for result in strategy_trends.values()
+    )
+    if not has_curve:
+        st.warning("所选对象暂时都无法绘制收益曲线，请检查交易记录或行情覆盖情况。")
+    else:
+        fig = build_trend_plot(user_trend, strategy_trends)
+        st.plotly_chart(fig, use_container_width=True)
+
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    if warning_blocks:
+        with st.expander("数据质量提示"):
+            for label, warnings in warning_blocks:
+                st.markdown(f"**{label}**")
+                for warning in warnings[:6]:
+                    st.markdown(f"- {warning}")
+
+
 def show_recommendation_page():
     user = st.session_state["current_user"]
     st.title("策略推荐")
@@ -822,6 +945,8 @@ def show_recommendation_page():
         st.divider()
         st.subheader("弹窗话术")
         st.info(result.popup_text)
+
+        _render_trend_curves(user, profile, result.top_n)
 
 
 # ============================================================

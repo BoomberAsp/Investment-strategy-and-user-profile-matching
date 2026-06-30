@@ -16,6 +16,9 @@ QUESTIONNAIRES_DIR = DATA_DIR / "questionnaires"
 # 源数据目录（统一放在 stats_data/ 下）
 STATS_DATA_DIR = PROJECT_ROOT / "stats_data"
 
+# 日度行情目录；收益曲线服务按股票代码懒加载，不在启动时整目录读入。
+MARKET_DATA_DIR = PROJECT_ROOT / "market_data_full_raw" / "daily_by_symbol"
+
 # 策略数据路径（与 pipeline.py 一致）
 STRATEGY_DATA_DIR = (
     STATS_DATA_DIR / "净值_交易_资金及字段说明（相关性数据分析）" / "products_export_20260518_163122"
