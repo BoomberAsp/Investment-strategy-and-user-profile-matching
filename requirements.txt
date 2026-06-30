@@ -2,6 +2,10 @@
 # Web app — 策略匹配网页应用
 # ============================================================
 streamlit>=1.30.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9
+itsdangerous>=2.2.0
 
 # Data processing
 pandas>=2.0.0

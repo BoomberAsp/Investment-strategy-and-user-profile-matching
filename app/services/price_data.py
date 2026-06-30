@@ -7,11 +7,12 @@ Streamlit 启动时读入全量行情。
 
 from __future__ import annotations
 
-import csv
 import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+import pandas as pd
 
 from app.config import MARKET_DATA_DIR
 
@@ -47,30 +48,25 @@ def _find_price_file(code: str) -> Path | None:
     return None
 
 
-@lru_cache(maxsize=512)
+@lru_cache(maxsize=4096)
 def _read_price_rows(code: str) -> tuple[tuple[str, float], ...]:
     file_path = _find_price_file(code)
     if file_path is None:
         return ()
 
-    rows: list[tuple[str, float]] = []
-    with file_path.open("r", encoding="utf-8-sig", newline="") as fh:
-        reader = csv.DictReader(fh)
-        for row in reader:
-            date_val = str(row.get("date", "")).strip()
-            close_val = str(row.get("close", "")).strip()
-            if not date_val or not close_val:
-                continue
-            try:
-                close = float(close_val)
-            except ValueError:
-                continue
-            if close <= 0:
-                continue
-            rows.append((date_val, close))
+    try:
+        df = pd.read_csv(file_path, usecols=["date", "close"], encoding="utf-8-sig")
+    except ValueError:
+        return ()
 
-    rows.sort(key=lambda item: item[0])
-    return tuple(rows)
+    df["date"] = df["date"].astype(str).str.strip()
+    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+    df = df[(df["date"] != "") & df["close"].notna() & (df["close"] > 0)]
+    if df.empty:
+        return ()
+
+    df = df.sort_values("date", kind="stable")
+    return tuple((row.date, float(row.close)) for row in df.itertuples(index=False))
 
 
 def get_historical_prices(

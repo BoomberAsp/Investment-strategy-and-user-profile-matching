@@ -1,3 +1,11 @@
 __pycache__/
 *.py[cod]
 .DS_Store
+frontend/node_modules/
+frontend/.next/
+frontend/.vercel/
+frontend/out/
+frontend/.env*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

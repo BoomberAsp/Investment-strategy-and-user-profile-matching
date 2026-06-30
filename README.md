@@ -88,14 +88,25 @@ python pipeline.py
 
 执行后将在 `output/` 目录下生成特征向量、PCA 结果、推荐结果与可视化图表。
 
-### 3. 启动网页应用
+### 3. 启动网页应用（Next.js + FastAPI）
 
 ```bash
-# 使用虚拟环境中的 Python
-investmentMatching/Scripts/python.exe -m streamlit run app.py
+# 终端 1：启动 Python API
+uvicorn api.main:app --reload --port 8000
+
+# 终端 2：启动 Next.js 前端
+cd frontend
+npm install
+npm run dev
 ```
 
-浏览器自动打开 `http://localhost:8501`。
+浏览器打开 `http://localhost:3000`。Next.js 会把 `/api/*` 请求转发到 `http://localhost:8000`。
+
+Streamlit 旧入口仍保留用于对照：
+
+```bash
+python -m streamlit run app.py
+```
 
 ### 4. 生成模拟数据（可选）
 
@@ -134,7 +145,16 @@ Investment-strategy-and-user-profile-matching/
 │                                         # 三层特征提取 + PCA + 相似度计算
 ├── generate_simulated_data.py           # 模拟数据生成器（500策略+200用户）
 │
-├── app.py                               # Streamlit 网页应用主入口
+├── app.py                               # Streamlit legacy 入口（对照/回滚）
+│
+├── api/                                 # FastAPI 后端（Next.js 主入口调用）
+│   ├── main.py                          # 认证、问卷、上传、推荐、曲线 API
+│   └── services.py                      # 非 Streamlit 服务初始化器
+│
+├── frontend/                            # Next.js 主前端
+│   ├── app/                             # App Router 页面与全局样式
+│   ├── components/                      # 推荐卡片、图表、侧栏等 React 组件
+│   └── lib/api.ts                       # 前端 API 类型与请求封装
 │
 ├── market_data_full_raw/                # 日度行情数据（收益曲线按需懒加载）
 │   └── daily_by_symbol/                 # 每个证券代码一个 CSV
@@ -252,11 +272,13 @@ cumulativeReturn_t = (totalAsset_t / initialAsset - 1) × 100
 
 当某些代码缺少日线行情时，系统使用首次成交价固定估值，并把该曲线标记为 `partial_missing_prices`。因此推荐页图表优先保证可展示，同时通过“数据质量提示”说明哪些代码使用了近似估值。
 
-### 收益曲线迁移说明
+### Next 前端替换说明
 
-本分支保留目标项目原有 Streamlit 架构、推荐逻辑、登录、问卷、上传和画像更新流程，只迁入收益曲线相关能力；没有迁入来源项目的 Next.js/React/Recharts 前端。
+本分支将主前端替换为 Next.js/Recharts/lucide 工作台，并通过 FastAPI 复用目标项目原有 Python service 层。Streamlit `app.py` 保留为 legacy 对照入口，但 README 主流程以 Next.js + FastAPI 为准。
 
-推荐页新增的收益曲线区域默认展示 Top1 推荐策略，用户可以手动勾选 TopN 中任意策略进行对比。客户曲线来自当前登录用户上传的交易记录；策略曲线使用全量日度行情按 `cash + position * close` 逐日重算，不直接复用 `strategy_nav`。`strategy_nav` 仍保留给原有推荐摘要、收益特征和稳定性分析逻辑使用。
+Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推荐、TopN 收益曲线对比、稳定性分析和设置。登录会话使用 HTTP-only signed cookie；账号、画像、问卷和上传记录继续使用目标项目现有 JSON 本地存储。
+
+推荐页默认展示 Top1 推荐策略曲线，用户可以手动勾选 TopN 中任意策略进行对比。客户曲线来自当前登录用户上传的交易记录；策略曲线使用全量日度行情按 `cash + position * close` 逐日重算，不直接复用 `strategy_nav`。`strategy_nav` 仍保留给原有推荐摘要、收益特征和稳定性分析逻辑使用。
 
 本次补充行情后，内置策略和模拟账户中仍有少量代码 Baostock 返回空数据：`123254`, `123255`, `127110`, `200025`, `200028`, `200541`, `200550`, `732210`, `732406`, `900912`, `900913`, `900922`, `900929`, `900942`, `900945`, `900948`。这些代码主要来自可转债、申购代码和 B 股，收益曲线会按成交价固定估值并在页面提示中标记。
 
@@ -318,8 +340,11 @@ cumulativeReturn_t = (totalAsset_t / initialAsset - 1) × 100
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  app.py (Streamlit UI)                              │
-│  - 页面路由、交互组件、可视化                        │
+│  frontend/ (Next.js UI)                             │
+│  - 登录、问卷、上传、画像、推荐、曲线、设置            │
+├─────────────────────────────────────────────────────┤
+│  api/ (FastAPI HTTP API)                            │
+│  - Cookie 会话、文件上传、JSON response 适配          │
 ├─────────────────────────────────────────────────────┤
 │  app/services/ (业务服务层)                          │
 │  - RecommendationService: 调度匹配后端              │
