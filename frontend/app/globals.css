@@ -658,7 +658,7 @@ h3 {
 
 .font-size-control {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--line);
@@ -688,6 +688,20 @@ h3 {
   background: rgba(37, 99, 235, 0.06);
   font-weight: 600;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18), 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+.content-focus-target {
+  scroll-margin-top: 24px;
+}
+
+.content-focus-target:focus {
+  outline: none;
+}
+
+.content-focus-target:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 /* ================================================================

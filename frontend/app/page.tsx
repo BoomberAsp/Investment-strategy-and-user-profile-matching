@@ -47,11 +47,12 @@ import {
   type TrendComparisonResponse,
 } from "@/lib/api";
 import { CollapsibleSidebar } from "@/components/CollapsibleSidebar";
-import { FontSizeControl, getFontScale, type FontScaleKey } from "@/components/FontSizeControl";
+import { FontSizeControl, getFontScale, normalizeFontScaleKey, type FontScaleKey } from "@/components/FontSizeControl";
 import { RadarChart } from "@/components/RadarChart";
 import { RecommendationBoard } from "@/components/RecommendationBoard";
 
 type PageKey = "home" | "questionnaire" | "upload" | "profile" | "recommend" | "stability" | "settings";
+type FocusTargetKey = PageKey | "trend";
 
 const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: React.ReactNode }> = [
   { key: "home", label: "首页", icon: <Home size={16} /> },
@@ -262,11 +263,28 @@ export default function HomePage() {
   const [stability, setStability] = useState<StabilityResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [authNotice, setAuthNotice] = useState("");
-  const trendSectionRef = useRef<HTMLElement | null>(null);
+  const mainContentRef = useRef<HTMLDivElement | null>(null);
+  const contentFocusRefs = useRef<Partial<Record<FocusTargetKey, HTMLElement | null>>>({});
+  const [focusRequest, setFocusRequest] = useState<{ target: FocusTargetKey; nonce: number } | null>(null);
   const [fontScaleKey, setFontScaleKey] = useState<FontScaleKey>(() => {
     if (typeof window === "undefined") return "md";
-    return (window.localStorage.getItem("investment-font-scale") as FontScaleKey) ?? "md";
+    return normalizeFontScaleKey(window.localStorage.getItem("investment-font-scale"));
   });
+
+  function setContentFocusRef(target: FocusTargetKey) {
+    return (node: HTMLElement | null) => {
+      contentFocusRefs.current[target] = node;
+    };
+  }
+
+  function requestContentFocus(target: FocusTargetKey) {
+    setFocusRequest({ target, nonce: Date.now() });
+  }
+
+  function navigateToPage(nextPage: PageKey) {
+    setActivePage(nextPage);
+    requestContentFocus(nextPage);
+  }
 
   useEffect(() => {
     async function load() {
@@ -280,6 +298,10 @@ export default function HomePage() {
     }
     void load();
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("investment-font-scale", fontScaleKey);
+  }, [fontScaleKey]);
 
   useEffect(() => {
     function handleUnauthorized(event: Event) {
@@ -330,11 +352,26 @@ export default function HomePage() {
 
   useEffect(() => {
     if (activePage !== "recommend" || !recommendation) return;
-    const timer = window.setTimeout(() => {
-      trendSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-    return () => window.clearTimeout(timer);
+    requestContentFocus("trend");
   }, [activePage, recommendation, trendStrategyIds.join("|")]);
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    const timer = window.setTimeout(() => {
+      const target = contentFocusRefs.current[focusRequest.target]
+        ?? contentFocusRefs.current[activePage]
+        ?? mainContentRef.current;
+      if (!target) return;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+        inline: "nearest",
+      });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [focusRequest, activePage, selectedLevel, recommendation]);
 
   function setFlash(nextMessage: string, nextError = "") {
     setMessage(nextMessage);
@@ -396,9 +433,11 @@ export default function HomePage() {
       if (next) {
         setSelectedLevel(next.level);
         setActivePage("questionnaire");
+        requestContentFocus("questionnaire");
         setFlash(`${state.message} 请继续完成 ${next.level}。`);
       } else {
         setActivePage("upload");
+        requestContentFocus("upload");
         setFlash(`${state.message} 三份问卷已完成，请上传交易数据。`);
       }
     } catch (err) {
@@ -420,6 +459,7 @@ export default function HomePage() {
           await refreshRecommendationAndTrends(pickDefaultBackend(state), topN);
           setBackend(pickDefaultBackend(state));
           setActivePage("recommend");
+          requestContentFocus("trend");
           setFlash(`${state.filename}: ${state.message} 已自动刷新推荐和收益曲线。`);
         } catch (recommendError) {
           setFlash(
@@ -443,6 +483,7 @@ export default function HomePage() {
     try {
       await refreshRecommendationAndTrends();
       setActivePage("recommend");
+      requestContentFocus("trend");
     } catch (err) {
       setFlash("", err instanceof Error ? err.message : "推荐计算失败");
     } finally {
@@ -453,10 +494,11 @@ export default function HomePage() {
   async function loadStability() {
     setBusy(true);
     setFlash("");
+    setActivePage("stability");
+    requestContentFocus("stability");
     try {
       const data = await fetchStability();
       setStability(data);
-      setActivePage("stability");
     } catch (err) {
       setFlash("", err instanceof Error ? err.message : "稳定性分析失败");
     } finally {
@@ -514,8 +556,8 @@ export default function HomePage() {
               type="button"
               className={activePage === item.key ? "nav-button active" : "nav-button"}
               onClick={() => {
-                setActivePage(item.key);
                 if (item.key === "stability") void loadStability();
+                else navigateToPage(item.key);
               }}
             >
               {item.icon}
@@ -528,7 +570,7 @@ export default function HomePage() {
       </CollapsibleSidebar>
 
       <div className="main-area">
-        <div className="main-area-inner">
+        <div className="main-area-inner" ref={mainContentRef}>
           <header className="topbar compact">
             <div>
               <p className="eyebrow">Next.js + FastAPI</p>
@@ -545,7 +587,7 @@ export default function HomePage() {
           {activePage === "home" ? (
             <section className="workspace-grid">
               <div className="workspace-panel">
-                <div className="panel-head"><Home size={18} /><h2>当前状态</h2></div>
+                <div className="panel-head"><Home size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("home")}>当前状态</h2></div>
                 <div className="status-grid">
                   <div><span>问卷完成度</span><strong>{completedText}</strong></div>
                   <div><span>上传次数</span><strong>{appState.uploads.length}</strong></div>
@@ -556,8 +598,8 @@ export default function HomePage() {
               <div className="workspace-panel">
                 <div className="panel-head"><SlidersHorizontal size={18} /><h2>快速操作</h2></div>
                 <div className="action-row">
-                  <button className="primary-button" type="button" onClick={() => setActivePage("questionnaire")}>完善问卷</button>
-                  <button className="secondary-button" type="button" onClick={() => setActivePage("upload")}>上传交易</button>
+                  <button className="primary-button" type="button" onClick={() => navigateToPage("questionnaire")}>完善问卷</button>
+                  <button className="secondary-button" type="button" onClick={() => navigateToPage("upload")}>上传交易</button>
                   <button className="secondary-button" type="button" onClick={() => void runRecommendation()} disabled={!profile || busy}>生成推荐</button>
                 </div>
               </div>
@@ -569,13 +611,13 @@ export default function HomePage() {
               <div className="panel-head"><ClipboardList size={18} /><h2>完善投资问卷</h2></div>
               <div className="segmented level-tabs">
                 {questionnaires.map((item) => (
-                  <button key={item.level} type="button" className={selectedLevel === item.level ? "active" : ""} onClick={() => { setSelectedLevel(item.level); setAnswers({}); }}>
+                  <button key={item.level} type="button" className={selectedLevel === item.level ? "active" : ""} onClick={() => { setSelectedLevel(item.level); setAnswers({}); requestContentFocus("questionnaire"); }}>
                     {item.level}{item.completed ? " ✓" : ""}
                   </button>
                 ))}
               </div>
               <div className="questionnaire-head">
-                <h3>{selectedQuestionnaire.title}</h3>
+                <h3 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("questionnaire")}>{selectedQuestionnaire.title}</h3>
                 <p>{selectedQuestionnaire.description}（约 {selectedQuestionnaire.estimatedMinutes} 分钟）</p>
               </div>
               <div className="question-list">
@@ -641,7 +683,7 @@ export default function HomePage() {
 
           {activePage === "upload" ? (
             <section className="workspace-panel">
-              <div className="panel-head"><Upload size={18} /><h2>上传交易数据</h2></div>
+              <div className="panel-head"><Upload size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("upload")}>上传交易数据</h2></div>
               <label className="field-label">分析时间窗口
                 <select value={uploadWindow} onChange={(event) => setUploadWindow(event.target.value)}>
                   <option value="all">全部数据</option>
@@ -672,7 +714,7 @@ export default function HomePage() {
 
           {activePage === "profile" ? (
             <section className="workspace-panel">
-              <div className="panel-head"><UserRound size={18} /><h2>我的投资画像</h2></div>
+              <div className="panel-head"><UserRound size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("profile")}>我的投资画像</h2></div>
               {profile ? (
                 <>
                   <div className="status-grid">
@@ -700,7 +742,7 @@ export default function HomePage() {
           {activePage === "recommend" ? (
             <section className="recommend-page">
               <div className="workspace-panel">
-                <div className="panel-head"><LineChartIcon size={18} /><h2>策略推荐</h2></div>
+                <div className="panel-head"><LineChartIcon size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("recommend")}>策略推荐</h2></div>
                 <div className="recommend-controls">
                   <label className="field-label">匹配算法
                     <select value={backend} onChange={(event) => setBackend(event.target.value)}>
@@ -726,10 +768,10 @@ export default function HomePage() {
                     customerProfile={recommendation.customer}
                     pcaVariance={recommendation.pca.explained_variance.map((v) => `${Math.round(v * 100)}%`).join(" / ")}
                   />
-                  <section className="trend-section" ref={trendSectionRef}>
+                  <section className="trend-section">
                     <div className="results-head">
                       <div>
-                        <h2>收益曲线对比</h2>
+                        <h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("trend")}>收益曲线对比</h2>
                         <p>默认展示 Top1，可勾选 TopN 中任意策略。</p>
                       </div>
                     </div>
@@ -775,7 +817,7 @@ export default function HomePage() {
 
           {activePage === "stability" ? (
             <section className="workspace-panel">
-              <div className="panel-head"><BarChart3 size={18} /><h2>匹配稳定性分析</h2></div>
+              <div className="panel-head"><BarChart3 size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("stability")}>匹配稳定性分析</h2></div>
               <button className="primary-button" type="button" onClick={() => void loadStability()} disabled={busy}>重新计算</button>
               {stability && !stability.ready ? <p className="status-text">{stability.message}</p> : null}
               {stability?.ready ? (
@@ -802,7 +844,7 @@ export default function HomePage() {
 
           {activePage === "settings" ? (
             <section className="workspace-panel">
-              <div className="panel-head"><Settings size={18} /><h2>设置</h2></div>
+              <div className="panel-head"><Settings size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("settings")}>设置</h2></div>
               {profile ? (
                 <>
                   <label className="field-label">默认匹配后端
