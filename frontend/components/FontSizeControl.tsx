@@ -1,5 +1,7 @@
 "use client";
 
+const DEFAULT_FONT_SCALE = "md";
+
 const OPTIONS = [
   { label: "默认", value: "md", scale: 1 },
   { label: "大", value: "lg", scale: 1.08 },
@@ -10,7 +12,7 @@ export type FontScaleKey = (typeof OPTIONS)[number]["value"];
 
 export function normalizeFontScaleKey(value: string | null): FontScaleKey {
   if (value === "lg" || value === "xl") return value;
-  return "md";
+  return DEFAULT_FONT_SCALE;
 }
 
 export function getFontScale(key: FontScaleKey): number {

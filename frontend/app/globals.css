@@ -667,13 +667,19 @@ h3 {
 }
 
 .font-size-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 32px;
+  padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--ink);
   background: transparent;
   font-size: 12px;
   font-weight: 500;
+  line-height: 1;
+  text-align: center;
   cursor: pointer;
   transition: all 140ms ease;
 }
