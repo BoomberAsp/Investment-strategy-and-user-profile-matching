@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   AlertCircle,
   BarChart3,
@@ -40,6 +40,7 @@ import {
   updateSettings,
   uploadTrades,
   type AppState,
+  type Question,
   type Questionnaire,
   type RecommendResponse,
   type StabilityResponse,
@@ -69,6 +70,7 @@ const CONFIDENCE_LABELS: Record<string, string> = {
 };
 
 const TREND_COLORS = ["#0f766e", "#c48112", "#c2415b", "#6d5bd0", "#0f9f6e", "#64748b"];
+const QUESTIONNAIRE_LEVELS: Array<Questionnaire["level"]> = ["L1", "L2", "L3"];
 
 function formatPct(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "--";
@@ -81,6 +83,37 @@ function pickDefaultBackend(state: AppState | null): string {
   if (preferred && state.backends.some((item) => item.name === preferred)) return preferred;
   if (state.backends.some((item) => item.name === "fusion")) return "fusion";
   return state.backends[0].name;
+}
+
+function getDefaultAnswer(question: Question): string | number | string[] | undefined {
+  if (question.type === "slider") {
+    return question.text.includes("亏损容忍度") ? 10 : 50;
+  }
+  if (question.type === "number_input") {
+    return 5;
+  }
+  return undefined;
+}
+
+function buildQuestionnairePayload(
+  questionnaire: Questionnaire,
+  answers: Record<string, string | number | string[]>,
+): Record<string, string | number | string[]> {
+  return questionnaire.questions.reduce<Record<string, string | number | string[]>>((payload, question) => {
+    const answer = answers[question.id] ?? getDefaultAnswer(question);
+    if (answer !== undefined) payload[question.id] = answer;
+    return payload;
+  }, {});
+}
+
+function findNextQuestionnaire(
+  questionnaires: Questionnaire[],
+  completedLevels: string[],
+): Questionnaire | null {
+  const completed = new Set(completedLevels);
+  return QUESTIONNAIRE_LEVELS
+    .map((level) => questionnaires.find((item) => item.level === level))
+    .find((item): item is Questionnaire => Boolean(item && !completed.has(item.level))) ?? null;
 }
 
 function AuthScreen({
@@ -222,6 +255,7 @@ export default function HomePage() {
   const [trendData, setTrendData] = useState<TrendComparisonResponse | null>(null);
   const [stability, setStability] = useState<StabilityResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const trendSectionRef = useRef<HTMLElement | null>(null);
   const [fontScaleKey, setFontScaleKey] = useState<FontScaleKey>(() => {
     if (typeof window === "undefined") return "md";
     return (window.localStorage.getItem("investment-font-scale") as FontScaleKey) ?? "md";
@@ -267,6 +301,14 @@ export default function HomePage() {
     };
   }, [trendStrategyIds, recommendation]);
 
+  useEffect(() => {
+    if (activePage !== "recommend" || !recommendation) return;
+    const timer = window.setTimeout(() => {
+      trendSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [activePage, recommendation, trendStrategyIds.join("|")]);
+
   function setFlash(nextMessage: string, nextError = "") {
     setMessage(nextMessage);
     setError(nextError);
@@ -285,6 +327,17 @@ export default function HomePage() {
     } catch (err) {
       setFlash("", err instanceof Error ? err.message : "刷新失败");
     }
+  }
+
+  async function refreshRecommendationAndTrends(nextBackend = backend, nextTopN = topN) {
+    const data = await fetchRecommendations({ backend: nextBackend, topN: nextTopN });
+    const first = data.recommendations[0]?.strategy_id ?? null;
+    const nextTrendIds = first ? [first] : [];
+    setRecommendation(data);
+    setSelectedStrategyId(first);
+    setTrendStrategyIds(nextTrendIds);
+    setTrendData(await fetchTrends(nextTrendIds));
+    return data;
   }
 
   async function handleLogout() {
@@ -306,12 +359,21 @@ export default function HomePage() {
     setBusy(true);
     setFlash("");
     try {
-      const state = await submitQuestionnaire(selectedQuestionnaire.level, answers);
+      const payload = buildQuestionnairePayload(selectedQuestionnaire, answers);
+      const state = await submitQuestionnaire(selectedQuestionnaire.level, payload);
       setAppState(state);
       const fresh = await fetchQuestionnaires();
       setQuestionnaires(fresh.questionnaires);
       setAnswers({});
-      setFlash(state.message);
+      const next = findNextQuestionnaire(fresh.questionnaires, state.completedLevels);
+      if (next) {
+        setSelectedLevel(next.level);
+        setActivePage("questionnaire");
+        setFlash(`${state.message} 请继续完成 ${next.level}。`);
+      } else {
+        setActivePage("upload");
+        setFlash(`${state.message} 三份问卷已完成，请上传交易数据。`);
+      }
     } catch (err) {
       setFlash("", err instanceof Error ? err.message : "问卷提交失败");
     } finally {
@@ -326,7 +388,21 @@ export default function HomePage() {
     try {
       const state = await uploadTrades(file, uploadWindow);
       setAppState(state);
-      setFlash(`${state.filename}: ${state.message}`);
+      if (state.profile) {
+        try {
+          await refreshRecommendationAndTrends(pickDefaultBackend(state), topN);
+          setBackend(pickDefaultBackend(state));
+          setActivePage("recommend");
+          setFlash(`${state.filename}: ${state.message} 已自动刷新推荐和收益曲线。`);
+        } catch (recommendError) {
+          setFlash(
+            `${state.filename}: ${state.message}`,
+            recommendError instanceof Error ? recommendError.message : "推荐和收益曲线自动刷新失败",
+          );
+        }
+      } else {
+        setFlash(`${state.filename}: ${state.message}`);
+      }
     } catch (err) {
       setFlash("", err instanceof Error ? err.message : "上传失败");
     } finally {
@@ -338,11 +414,7 @@ export default function HomePage() {
     setBusy(true);
     setFlash("");
     try {
-      const data = await fetchRecommendations({ backend, topN });
-      setRecommendation(data);
-      const first = data.recommendations[0]?.strategy_id ?? null;
-      setSelectedStrategyId(first);
-      setTrendStrategyIds(first ? [first] : []);
+      await refreshRecommendationAndTrends();
       setActivePage("recommend");
     } catch (err) {
       setFlash("", err instanceof Error ? err.message : "推荐计算失败");
@@ -627,7 +699,7 @@ export default function HomePage() {
                     customerProfile={recommendation.customer}
                     pcaVariance={recommendation.pca.explained_variance.map((v) => `${Math.round(v * 100)}%`).join(" / ")}
                   />
-                  <section className="trend-section">
+                  <section className="trend-section" ref={trendSectionRef}>
                     <div className="results-head">
                       <div>
                         <h2>收益曲线对比</h2>

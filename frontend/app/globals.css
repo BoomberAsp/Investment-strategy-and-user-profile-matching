@@ -543,8 +543,8 @@ h3 {
 
 .dashboard-layout {
   display: flex;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  overflow: visible;
   font-size: calc(1rem * var(--font-scale, 1));
 }
 
@@ -553,14 +553,14 @@ h3 {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: visible;
   overflow-x: hidden;
   background: var(--bg);
 }
 
 .main-area-inner {
   flex: 1;
-  padding: 24px;
+  padding: 24px 24px 64px;
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
@@ -571,7 +571,8 @@ h3 {
    ================================================================ */
 
 .sidebar {
-  position: relative;
+  position: sticky;
+  top: 0;
   flex: 0 0 320px;
   width: 320px;
   min-width: 0;
@@ -816,6 +817,8 @@ h3 {
 
 .trend-section {
   margin-top: 8px;
+  padding-bottom: 24px;
+  scroll-margin-top: 24px;
 }
 
 .trend-section h2 {
@@ -825,7 +828,8 @@ h3 {
 
 .trend-chart-container {
   padding: 24px;
-  min-height: 280px;
+  min-height: 430px;
+  overflow: visible;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
@@ -926,7 +930,7 @@ h3 {
   }
 
   .main-area-inner {
-    padding: 16px;
+    padding: 16px 16px 56px;
   }
 
   .account-summary {
@@ -983,7 +987,12 @@ h3 {
   }
 
   .main-area-inner {
-    padding: 12px;
+    padding: 12px 12px 52px;
+  }
+
+  .trend-chart-container {
+    padding: 14px;
+    min-height: 408px;
   }
 
   .preference-weight-slider input[type="range"] {
@@ -1075,7 +1084,7 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 560px;
+  min-height: min(520px, 70vh);
   overflow: visible;
   cursor: default;
   outline: none;
@@ -1162,7 +1171,7 @@ h3 {
 
 .recommendation-card-focused {
   padding: 28px 32px;
-  max-height: 78vh;
+  max-height: min(760px, calc(100vh - 160px));
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
@@ -1837,6 +1846,7 @@ tr:last-child td {
 .recommend-page {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .recommend-controls {
