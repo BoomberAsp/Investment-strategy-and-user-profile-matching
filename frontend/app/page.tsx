@@ -117,15 +117,21 @@ function findNextQuestionnaire(
 }
 
 function AuthScreen({
+  initialMessage,
   onAuthed,
 }: {
+  initialMessage?: string;
   onAuthed: (state: AppState) => void;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage ?? "");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setMessage(initialMessage ?? "");
+  }, [initialMessage]);
 
   async function submit() {
     setBusy(true);
@@ -255,6 +261,7 @@ export default function HomePage() {
   const [trendData, setTrendData] = useState<TrendComparisonResponse | null>(null);
   const [stability, setStability] = useState<StabilityResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [authNotice, setAuthNotice] = useState("");
   const trendSectionRef = useRef<HTMLElement | null>(null);
   const [fontScaleKey, setFontScaleKey] = useState<FontScaleKey>(() => {
     if (typeof window === "undefined") return "md";
@@ -264,7 +271,7 @@ export default function HomePage() {
   useEffect(() => {
     async function load() {
       try {
-        const state = await fetchSession();
+        const state = await fetchSession({ suppressAuthEvent: true });
         setAppState(state);
         setBackend(pickDefaultBackend(state));
       } catch {
@@ -272,6 +279,26 @@ export default function HomePage() {
       }
     }
     void load();
+  }, []);
+
+  useEffect(() => {
+    function handleUnauthorized(event: Event) {
+      const detail = event instanceof CustomEvent && typeof event.detail === "string"
+        ? event.detail
+        : "登录状态已失效";
+      setAppState(null);
+      setRecommendation(null);
+      setTrendData(null);
+      setTrendStrategyIds([]);
+      setSelectedStrategyId(null);
+      setStability(null);
+      setAnswers({});
+      setAuthNotice(detail === "Not authenticated" ? "请先登录后继续操作。" : detail);
+      setFlash("");
+    }
+
+    window.addEventListener("investment:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("investment:unauthorized", handleUnauthorized);
   }, []);
 
   useEffect(() => {
@@ -469,7 +496,7 @@ export default function HomePage() {
   }
 
   if (appState === null) {
-    return <AuthScreen onAuthed={(state) => { setAppState(state); setBackend(pickDefaultBackend(state)); }} />;
+    return <AuthScreen initialMessage={authNotice} onAuthed={(state) => { setAuthNotice(""); setAppState(state); setBackend(pickDefaultBackend(state)); }} />;
   }
 
   return (

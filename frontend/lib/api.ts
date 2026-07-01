@@ -1,4 +1,15 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const AUTH_PATHS = new Set(["/api/auth/login", "/api/auth/register"]);
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 function apiUrl(path: string): string {
   if (!API_BASE) return path;
@@ -6,18 +17,19 @@ function apiUrl(path: string): string {
   return `${API_BASE}${backendPath}`;
 }
 
-type RequestOptions = RequestInit & { json?: unknown };
+type RequestOptions = RequestInit & { json?: unknown; suppressAuthEvent?: boolean };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { json, suppressAuthEvent, ...init } = options;
   const headers = new Headers(options.headers);
   let body = options.body;
-  if (options.json !== undefined) {
+  if (json !== undefined) {
     headers.set("Content-Type", "application/json");
-    body = JSON.stringify(options.json);
+    body = JSON.stringify(json);
   }
 
   const response = await fetch(apiUrl(path), {
-    ...options,
+    ...init,
     headers,
     body,
     credentials: "include",
@@ -32,7 +44,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       const text = await response.text();
       if (text) message = text;
     }
-    throw new Error(message);
+    if (response.status === 401 && !suppressAuthEvent && !AUTH_PATHS.has(path) && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("investment:unauthorized", { detail: message }));
+    }
+    throw new ApiError(message, response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -217,8 +232,8 @@ export type StabilityResponse = {
   conclusion: string;
 };
 
-export async function fetchSession(): Promise<AppState> {
-  return request<AppState>("/api/auth/me");
+export async function fetchSession(options: { suppressAuthEvent?: boolean } = {}): Promise<AppState> {
+  return request<AppState>("/api/auth/me", { suppressAuthEvent: options.suppressAuthEvent });
 }
 
 export async function login(username: string, password: string): Promise<AppState & { message: string }> {
