@@ -94,8 +94,34 @@ export type FeatureChartItem = {
   strategyAverage: number;
 };
 
+export type CustomerStatus =
+  | "new"
+  | "needs_questionnaire"
+  | "needs_trades"
+  | "needs_profile"
+  | "ready_to_recommend";
+
+export type Customer = {
+  customerId: string;
+  ownerUserId: string;
+  name: string;
+  status: CustomerStatus;
+  statusLabel: string;
+  nextAction: string;
+  note: string;
+  createdAt: string;
+  lastUpdated: string;
+  completedLevels: string[];
+  uploadCount: number;
+  tradeCount: number;
+  hasProfile: boolean;
+  confidenceLevel: "low" | "medium" | "high" | null;
+};
+
 export type AppState = {
   user: User;
+  currentCustomer: Customer;
+  customers: Customer[];
   profile: Profile | null;
   completedLevels: string[];
   uploads: UploadRecord[];
@@ -248,21 +274,50 @@ export async function logout(): Promise<{ message: string }> {
   return request("/api/auth/logout", { method: "POST" });
 }
 
-export async function fetchQuestionnaires(): Promise<{ questionnaires: Questionnaire[] }> {
-  return request("/api/questionnaires");
+function customerQuery(customerId?: string): string {
+  return customerId ? `?customer_id=${encodeURIComponent(customerId)}` : "";
+}
+
+export async function fetchCustomers(): Promise<{ customers: Customer[] }> {
+  return request("/api/customers");
+}
+
+export async function createCustomer(input: { name: string; note?: string }): Promise<AppState & { message: string }> {
+  return request("/api/customers", {
+    method: "POST",
+    json: { name: input.name, note: input.note ?? "" },
+  });
+}
+
+export async function fetchCustomerState(customerId: string): Promise<AppState> {
+  return request(`/api/customers/${encodeURIComponent(customerId)}`);
+}
+
+export async function updateCustomer(input: { customerId: string; name?: string; note?: string; status?: string }): Promise<AppState & { message: string }> {
+  return request(`/api/customers/${encodeURIComponent(input.customerId)}`, {
+    method: "PATCH",
+    json: { name: input.name, note: input.note, status: input.status },
+  });
+}
+
+export async function fetchQuestionnaires(customerId?: string): Promise<{ questionnaires: Questionnaire[] }> {
+  return request(`/api/questionnaires${customerQuery(customerId)}`);
 }
 
 export async function submitQuestionnaire(
   level: string,
   answers: Record<string, string | number | string[]>,
+  customerId?: string,
 ): Promise<AppState & { message: string }> {
-  return request(`/api/questionnaires/${level}`, { method: "POST", json: { answers } });
+  return request(`/api/questionnaires/${level}${customerQuery(customerId)}`, { method: "POST", json: { answers } });
 }
 
-export async function uploadTrades(file: File, window: string): Promise<AppState & { message: string; filename: string; tradeCount: number; lstmAccount: string | null }> {
+export async function uploadTrades(file: File, window: string, customerId?: string): Promise<AppState & { message: string; filename: string; tradeCount: number; lstmAccount: string | null }> {
   const form = new FormData();
   form.append("file", file);
-  return request(`/api/trades/upload?window=${encodeURIComponent(window)}`, {
+  const params = new URLSearchParams({ window });
+  if (customerId) params.set("customer_id", customerId);
+  return request(`/api/trades/upload?${params.toString()}`, {
     method: "POST",
     body: form,
   });
@@ -271,30 +326,32 @@ export async function uploadTrades(file: File, window: string): Promise<AppState
 export async function fetchRecommendations(input: {
   backend: string;
   topN: number;
+  customerId?: string;
 }): Promise<RecommendResponse> {
-  return request("/api/recommend", {
+  return request(`/api/recommend${customerQuery(input.customerId)}`, {
     method: "POST",
     json: { backend: input.backend, top_n: input.topN },
   });
 }
 
-export async function fetchTrends(strategyIds: string[]): Promise<TrendComparisonResponse> {
-  return request("/api/trends", {
+export async function fetchTrends(strategyIds: string[], customerId?: string): Promise<TrendComparisonResponse> {
+  return request(`/api/trends${customerQuery(customerId)}`, {
     method: "POST",
     json: { strategy_ids: strategyIds },
   });
 }
 
-export async function fetchStability(): Promise<StabilityResponse> {
-  return request("/api/stability");
+export async function fetchStability(customerId?: string): Promise<StabilityResponse> {
+  return request(`/api/stability${customerQuery(customerId)}`);
 }
 
 export async function updateSettings(input: {
   beta?: number;
   backend?: string;
   fusionAlpha?: number;
+  customerId?: string;
 }): Promise<AppState & { message: string }> {
-  return request("/api/settings", {
+  return request(`/api/settings${customerQuery(input.customerId)}`, {
     method: "PATCH",
     json: {
       beta: input.beta,
@@ -304,6 +361,6 @@ export async function updateSettings(input: {
   });
 }
 
-export async function clearTrades(): Promise<AppState & { message: string }> {
-  return request("/api/trades/clear", { method: "POST" });
+export async function clearTrades(customerId?: string): Promise<AppState & { message: string }> {
+  return request(`/api/trades/clear${customerQuery(customerId)}`, { method: "POST" });
 }

@@ -12,7 +12,7 @@ try:
 except ImportError:
     FileLock = None
 
-from app.models.user import User, UserProfile
+from app.models.user import Customer, User, UserProfile
 from app.config import USERS_FILE, PROFILES_DIR, TRADES_DIR, QUESTIONNAIRES_DIR
 
 
@@ -40,6 +40,7 @@ class StorageService:
     def __init__(self, data_dir: Path | None = None):
         self.data_dir = data_dir or Path(__file__).parent.parent / "data"
         self.users_file = self.data_dir / "users.json"
+        self.customers_file = self.data_dir / "customers.json"
         self.profiles_dir = self.data_dir / "profiles"
         self.trades_dir = self.data_dir / "trades"
         self.questionnaires_dir = self.data_dir / "questionnaires"
@@ -53,6 +54,8 @@ class StorageService:
     def _ensure_users_file(self):
         if not self.users_file.exists():
             self._write_json(self.users_file, {"users": []})
+        if not self.customers_file.exists():
+            self._write_json(self.customers_file, {"customers": []})
 
     # ===== JSON 读写 =====
 
@@ -115,6 +118,61 @@ class StorageService:
                 except ValueError:
                     pass
         return f"U_{max_id + 1:04d}"
+
+    # ===== 客户 CRUD =====
+
+    def save_customer(self, customer: Customer) -> bool:
+        customer.touch()
+        data = self._read_json(self.customers_file)
+        customers = data.get("customers", [])
+        for i, row in enumerate(customers):
+            if row["customer_id"] == customer.customer_id:
+                customers[i] = customer.to_dict()
+                self._write_json(self.customers_file, {"customers": customers})
+                return True
+        customers.append(customer.to_dict())
+        self._write_json(self.customers_file, {"customers": customers})
+        return True
+
+    def get_customer(self, owner_user_id: str, customer_id: str) -> Customer | None:
+        data = self._read_json(self.customers_file)
+        for row in data.get("customers", []):
+            if row["customer_id"] == customer_id and row["owner_user_id"] == owner_user_id:
+                return Customer.from_dict(row)
+        return None
+
+    def list_customers(self, owner_user_id: str) -> list[Customer]:
+        data = self._read_json(self.customers_file)
+        return [
+            Customer.from_dict(row)
+            for row in data.get("customers", [])
+            if row.get("owner_user_id") == owner_user_id
+        ]
+
+    def generate_customer_id(self) -> str:
+        data = self._read_json(self.customers_file)
+        max_id = 0
+        for row in data.get("customers", []):
+            customer_id = row.get("customer_id", "")
+            if customer_id.startswith("C_"):
+                try:
+                    max_id = max(max_id, int(customer_id[2:]))
+                except ValueError:
+                    pass
+        return f"C_{max_id + 1:04d}"
+
+    def ensure_default_customer(self, user: User) -> Customer:
+        customer = self.get_customer(user.user_id, user.user_id)
+        if customer is not None:
+            return customer
+        customer = Customer.create(
+            customer_id=user.user_id,
+            owner_user_id=user.user_id,
+            name=user.username,
+            note="由旧版单客户数据自动创建的默认客户档案。",
+        )
+        self.save_customer(customer)
+        return customer
 
     # ===== 画像 CRUD =====
 

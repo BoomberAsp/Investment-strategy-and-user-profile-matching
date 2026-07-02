@@ -67,6 +67,17 @@ class QuestionnaireSubmit(BaseModel):
     answers: dict[str, Any]
 
 
+class CustomerPayload(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    note: str = Field(default="", max_length=1000)
+
+
+class CustomerUpdatePayload(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    note: str | None = Field(default=None, max_length=1000)
+    status: str | None = Field(default=None, max_length=80)
+
+
 class RecommendPayload(BaseModel):
     backend: str = "fusion"
     top_n: int = Field(default=5, ge=1, le=20)
@@ -161,6 +172,52 @@ def _user_to_dict(user) -> dict[str, Any]:
         "createdAt": user.created_at,
         "lastLogin": user.last_login,
         "onboardingStatus": user.onboarding_status,
+    }
+
+
+def _customer_entity_id(user, customer_id: str | None = None) -> str:
+    services = _services()
+    if not customer_id:
+        return services["storage"].ensure_default_customer(user).customer_id
+    customer = services["storage"].get_customer(user.user_id, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="客户不存在或无权访问。")
+    return customer.customer_id
+
+
+def _customer_status(entity_id: str, services: dict) -> tuple[str, str, str]:
+    completed = services["storage"].list_completed_levels(entity_id)
+    uploads = services["storage"].list_trade_uploads(entity_id)
+    profile = services["profile_svc"].get_profile(entity_id)
+    if len(completed) < 3:
+        return "needs_questionnaire", "待补资料", f"继续完成问卷：{len(completed)}/3"
+    if not uploads:
+        return "needs_trades", "待上传交易", "上传交易流水以更新客户画像"
+    if profile is None or not profile.features:
+        return "needs_profile", "待生成画像", "补齐画像后再生成推荐"
+    return "ready_to_recommend", "可生成推荐", "可生成推荐方案并与客户沟通"
+
+
+def _customer_to_dict(customer, services: dict) -> dict[str, Any]:
+    completed = services["storage"].list_completed_levels(customer.customer_id)
+    uploads = services["storage"].list_trade_uploads(customer.customer_id)
+    profile = services["profile_svc"].get_profile(customer.customer_id)
+    status, status_label, next_action = _customer_status(customer.customer_id, services)
+    return {
+        "customerId": customer.customer_id,
+        "ownerUserId": customer.owner_user_id,
+        "name": customer.name,
+        "status": status,
+        "statusLabel": status_label,
+        "nextAction": next_action,
+        "note": customer.note,
+        "createdAt": customer.created_at,
+        "lastUpdated": customer.last_updated,
+        "completedLevels": completed,
+        "uploadCount": len(uploads),
+        "tradeCount": sum(upload["trade_count"] for upload in uploads),
+        "hasProfile": profile is not None and bool(profile.features),
+        "confidenceLevel": profile.confidence_level if profile else None,
     }
 
 
@@ -329,14 +386,20 @@ def _read_upload(file: UploadFile, content: bytes) -> pd.DataFrame:
     return pd.read_excel(buffer)
 
 
-def _app_state(user) -> dict[str, Any]:
+def _app_state(user, customer_id: str | None = None) -> dict[str, Any]:
     services = _services()
-    profile = services["profile_svc"].get_profile(user.user_id)
-    completed = services["storage"].list_completed_levels(user.user_id)
-    uploads = services["storage"].list_trade_uploads(user.user_id)
+    default_customer = services["storage"].ensure_default_customer(user)
+    entity_id = _customer_entity_id(user, customer_id or default_customer.customer_id)
+    current_customer = services["storage"].get_customer(user.user_id, entity_id) or default_customer
+    customers = services["storage"].list_customers(user.user_id)
+    profile = services["profile_svc"].get_profile(entity_id)
+    completed = services["storage"].list_completed_levels(entity_id)
+    uploads = services["storage"].list_trade_uploads(entity_id)
     active_backends = services["registry"].list_active()
     return {
         "user": _user_to_dict(user),
+        "currentCustomer": _customer_to_dict(current_customer, services),
+        "customers": [_customer_to_dict(customer, services) for customer in customers],
         "profile": _profile_to_dict(profile),
         "completedLevels": completed,
         "uploads": uploads,
@@ -390,11 +453,60 @@ def me(user=Depends(current_user)) -> dict[str, Any]:
     return _app_state(user)
 
 
+@app.get("/api/customers")
+@app.get("/customers")
+def list_customers(user=Depends(current_user)) -> dict[str, Any]:
+    services = _services()
+    services["storage"].ensure_default_customer(user)
+    customers = services["storage"].list_customers(user.user_id)
+    return {"customers": [_customer_to_dict(customer, services) for customer in customers]}
+
+
+@app.post("/api/customers")
+@app.post("/customers")
+def create_customer(payload: CustomerPayload, user=Depends(current_user)) -> dict[str, Any]:
+    from app.models.user import Customer
+
+    services = _services()
+    customer = Customer.create(
+        customer_id=services["storage"].generate_customer_id(),
+        owner_user_id=user.user_id,
+        name=payload.name.strip(),
+        note=payload.note.strip(),
+    )
+    services["storage"].save_customer(customer)
+    return {"message": "客户已创建。", **_app_state(user, customer.customer_id)}
+
+
+@app.get("/api/customers/{customer_id}")
+@app.get("/customers/{customer_id}")
+def get_customer(customer_id: str, user=Depends(current_user)) -> dict[str, Any]:
+    return _app_state(user, customer_id)
+
+
+@app.patch("/api/customers/{customer_id}")
+@app.patch("/customers/{customer_id}")
+def update_customer(customer_id: str, payload: CustomerUpdatePayload, user=Depends(current_user)) -> dict[str, Any]:
+    services = _services()
+    customer = services["storage"].get_customer(user.user_id, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="客户不存在或无权访问。")
+    if payload.name is not None:
+        customer.name = payload.name.strip()
+    if payload.note is not None:
+        customer.note = payload.note.strip()
+    if payload.status is not None:
+        customer.status = payload.status
+    services["storage"].save_customer(customer)
+    return {"message": "客户已更新。", **_app_state(user, customer.customer_id)}
+
+
 @app.get("/api/questionnaires")
 @app.get("/questionnaires")
-def questionnaires(user=Depends(current_user)) -> dict[str, Any]:
+def questionnaires(customer_id: str | None = None, user=Depends(current_user)) -> dict[str, Any]:
     services = _services()
-    completed = set(services["storage"].list_completed_levels(user.user_id))
+    entity_id = _customer_entity_id(user, customer_id)
+    completed = set(services["storage"].list_completed_levels(entity_id))
     return {
         "questionnaires": [
             _questionnaire_to_dict(qn, qn.level in completed)
@@ -405,9 +517,15 @@ def questionnaires(user=Depends(current_user)) -> dict[str, Any]:
 
 @app.post("/api/questionnaires/{level}")
 @app.post("/questionnaires/{level}")
-def submit_questionnaire(level: str, payload: QuestionnaireSubmit, user=Depends(current_user)) -> dict[str, Any]:
+def submit_questionnaire(
+    level: str,
+    payload: QuestionnaireSubmit,
+    customer_id: str | None = None,
+    user=Depends(current_user),
+) -> dict[str, Any]:
     level = level.upper()
     services = _services()
+    entity_id = _customer_entity_id(user, customer_id)
     try:
         qn = services["questionnaire_svc"].get_questionnaire(level)
     except KeyError:
@@ -424,11 +542,11 @@ def submit_questionnaire(level: str, payload: QuestionnaireSubmit, user=Depends(
         raise HTTPException(status_code=400, detail=f"请回答所有问题。未回答: {', '.join(missing)}")
 
     score_result = services["questionnaire_svc"].score_answers(level, payload.answers)
-    services["storage"].save_questionnaire_results(user.user_id, level, payload.answers)
+    services["storage"].save_questionnaire_results(entity_id, level, payload.answers)
 
-    profile = services["profile_svc"].get_profile(user.user_id)
+    profile = services["profile_svc"].get_profile(entity_id)
     if profile is None:
-        profile = services["profile_svc"].create_profile_from_questionnaire(user.user_id, score_result)
+        profile = services["profile_svc"].create_profile_from_questionnaire(entity_id, score_result)
     else:
         profile.beta = score_result["beta"]
         profile.risk_tolerance = score_result["risk_tolerance"]
@@ -439,7 +557,7 @@ def submit_questionnaire(level: str, payload: QuestionnaireSubmit, user=Depends(
         profile.last_updated = _now()
         services["storage"].save_profile(profile)
 
-    return {"message": "问卷提交成功，画像已更新。", **_app_state(user)}
+    return {"message": "问卷提交成功，客户画像已更新。", **_app_state(user, entity_id)}
 
 
 @app.post("/api/trades/upload")
@@ -447,6 +565,7 @@ def submit_questionnaire(level: str, payload: QuestionnaireSubmit, user=Depends(
 async def upload_trades(
     file: UploadFile = File(...),
     window: str = "all",
+    customer_id: str | None = None,
     user=Depends(current_user),
 ) -> dict[str, Any]:
     from app.config import ROLLING_WINDOW_OPTIONS
@@ -460,16 +579,17 @@ async def upload_trades(
         raise HTTPException(status_code=400, detail=f"无法读取交易文件: {exc}") from exc
 
     services = _services()
-    services["storage"].save_trades(user.user_id, trades_df)
+    entity_id = _customer_entity_id(user, customer_id)
+    services["storage"].save_trades(entity_id, trades_df)
     profile = services["profile_svc"].update_profile_with_trades(
-        user.user_id,
+        entity_id,
         trades_df,
         window_days=ROLLING_WINDOW_OPTIONS.get(window, None),
     )
 
     lstm_account = None
     if services["lstm_available"]:
-        lstm_account = services["lstm_backend"].assign_account(user.user_id)
+        lstm_account = services["lstm_backend"].assign_account(entity_id)
 
     return {
         "message": "上传成功，画像已更新。",
@@ -477,21 +597,23 @@ async def upload_trades(
         "tradeCount": len(trades_df),
         "profile": _profile_to_dict(profile),
         "lstmAccount": lstm_account,
-        **_app_state(user),
+        **_app_state(user, entity_id),
     }
 
 
 @app.get("/api/profile")
 @app.get("/profile")
-def profile(user=Depends(current_user)) -> dict[str, Any]:
-    return _app_state(user)
+def profile(customer_id: str | None = None, user=Depends(current_user)) -> dict[str, Any]:
+    return _app_state(user, customer_id)
 
 
 @app.post("/api/recommend")
 @app.post("/recommend")
-def recommend(payload: RecommendPayload, user=Depends(current_user)) -> dict[str, Any]:
+def recommend(payload: RecommendPayload, customer_id: str | None = None, user=Depends(current_user)) -> dict[str, Any]:
     services = _services()
-    profile = services["profile_svc"].get_profile(user.user_id)
+    entity_id = _customer_entity_id(user, customer_id)
+    customer = services["storage"].get_customer(user.user_id, entity_id)
+    profile = services["profile_svc"].get_profile(entity_id)
     if profile is None or not profile.features:
         raise HTTPException(status_code=400, detail="请先完成问卷以获取推荐。")
 
@@ -500,7 +622,7 @@ def recommend(payload: RecommendPayload, user=Depends(current_user)) -> dict[str
         backend = "fusion" if "fusion" in services["registry"].list_active() else "statistical"
 
     result = services["recommendation_svc"].recommend(
-        user.user_id,
+        entity_id,
         profile.features,
         profile,
         backend_name=backend,
@@ -512,9 +634,9 @@ def recommend(payload: RecommendPayload, user=Depends(current_user)) -> dict[str
     ]
     return {
         "customer": {
-            "id": user.user_id,
-            "username": user.username,
-            "trade_count": sum(upload["trade_count"] for upload in services["storage"].list_trade_uploads(user.user_id)),
+            "id": entity_id,
+            "username": customer.name if customer else entity_id,
+            "trade_count": sum(upload["trade_count"] for upload in services["storage"].list_trade_uploads(entity_id)),
             "buy_ratio": 0.0,
             "active_days": 0,
             "turnover_proxy": 0.0,
@@ -533,16 +655,17 @@ def recommend(payload: RecommendPayload, user=Depends(current_user)) -> dict[str
 
 @app.post("/api/trends")
 @app.post("/trends")
-def trends(payload: TrendPayload, user=Depends(current_user)) -> dict[str, Any]:
+def trends(payload: TrendPayload, customer_id: str | None = None, user=Depends(current_user)) -> dict[str, Any]:
     from app.services.trend_service import compute_user_trend
 
     services = _services()
-    profile = services["profile_svc"].get_profile(user.user_id)
+    entity_id = _customer_entity_id(user, customer_id)
+    profile = services["profile_svc"].get_profile(entity_id)
     customer_trend = None
-    user_trades = services["storage"].load_trades(user.user_id)
+    user_trades = services["storage"].load_trades(entity_id)
     if user_trades is not None and not user_trades.empty:
         customer_trend = compute_user_trend(
-            user.user_id,
+            entity_id,
             user_trades,
             initial_capital=_safe_float(getattr(profile, "initial_capital", 0.0), 0.0),
         )
@@ -559,15 +682,16 @@ def trends(payload: TrendPayload, user=Depends(current_user)) -> dict[str, Any]:
 
 @app.get("/api/stability")
 @app.get("/stability")
-def stability(user=Depends(current_user)) -> dict[str, Any]:
+def stability(customer_id: str | None = None, user=Depends(current_user)) -> dict[str, Any]:
     from app.models.user import UserProfile
 
     services = _services()
-    profile = services["profile_svc"].get_profile(user.user_id)
+    entity_id = _customer_entity_id(user, customer_id)
+    profile = services["profile_svc"].get_profile(entity_id)
     if profile is None:
         raise HTTPException(status_code=400, detail="请先完成问卷。")
 
-    trades_df = services["storage"].load_trades(user.user_id)
+    trades_df = services["storage"].load_trades(entity_id)
     if trades_df is None or len(trades_df) < 10:
         return {
             "ready": False,
@@ -594,8 +718,8 @@ def stability(user=Depends(current_user)) -> dict[str, Any]:
                     continue
 
             features = services["extractor"].extract_user_features(filtered)
-            temp_profile = UserProfile(user_id=user.user_id, beta=profile.beta, features=features, confidence_level="high")
-            rec = services["recommendation_svc"].recommend(user.user_id, features, temp_profile)
+            temp_profile = UserProfile(user_id=entity_id, beta=profile.beta, features=features, confidence_level="high")
+            rec = services["recommendation_svc"].recommend(entity_id, features, temp_profile)
             top1 = rec.top_n[0] if rec.top_n else None
             window_rows.append({
                 "window": label,
@@ -609,11 +733,11 @@ def stability(user=Depends(current_user)) -> dict[str, Any]:
     comparison_rows = []
     active_backends = services["registry"].list_active()
     features = services["extractor"].extract_user_features(trades_df)
-    temp_profile = UserProfile(user_id=user.user_id, beta=profile.beta, features=features, confidence_level="high")
+    temp_profile = UserProfile(user_id=entity_id, beta=profile.beta, features=features, confidence_level="high")
     for backend_name in active_backends:
         try:
             rec = services["recommendation_svc"].recommend(
-                user.user_id,
+                entity_id,
                 features,
                 temp_profile,
                 backend_name=backend_name,
@@ -655,14 +779,15 @@ def stability(user=Depends(current_user)) -> dict[str, Any]:
 
 @app.patch("/api/settings")
 @app.patch("/settings")
-def update_settings(payload: SettingsPayload, user=Depends(current_user)) -> dict[str, Any]:
+def update_settings(payload: SettingsPayload, customer_id: str | None = None, user=Depends(current_user)) -> dict[str, Any]:
     services = _services()
-    profile = services["profile_svc"].get_profile(user.user_id)
+    entity_id = _customer_entity_id(user, customer_id)
+    profile = services["profile_svc"].get_profile(entity_id)
     if profile is None:
         raise HTTPException(status_code=400, detail="请先完成问卷。")
 
     if payload.beta is not None:
-        profile = services["profile_svc"].update_beta(user.user_id, payload.beta)
+        profile = services["profile_svc"].update_beta(entity_id, payload.beta)
     if payload.backend is not None:
         if payload.backend not in services["registry"].list_active():
             raise HTTPException(status_code=400, detail=f"未知匹配后端: {payload.backend}")
@@ -671,11 +796,12 @@ def update_settings(payload: SettingsPayload, user=Depends(current_user)) -> dic
     if payload.fusion_alpha is not None:
         services["fusion_backend"].set_alpha(payload.fusion_alpha)
 
-    return {"message": "设置已更新。", **_app_state(user)}
+    return {"message": "设置已更新。", **_app_state(user, entity_id)}
 
 
 @app.post("/api/trades/clear")
 @app.post("/trades/clear")
-def clear_trades(user=Depends(current_user)) -> dict[str, Any]:
-    _services()["profile_svc"].clear_trade_data(user.user_id)
-    return {"message": "交易数据已清除。", **_app_state(user)}
+def clear_trades(customer_id: str | None = None, user=Depends(current_user)) -> dict[str, Any]:
+    entity_id = _customer_entity_id(user, customer_id)
+    _services()["profile_svc"].clear_trade_data(entity_id)
+    return {"message": "交易数据已清除。", **_app_state(user, entity_id)}
