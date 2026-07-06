@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   AlertCircle,
+  ArrowRight,
   BarChart3,
   CheckCircle2,
   ClipboardList,
@@ -10,6 +11,7 @@ import {
   FileSpreadsheet,
   LineChart as LineChartIcon,
   LogOut,
+  Menu,
   RefreshCw,
   Search,
   Settings,
@@ -146,6 +148,131 @@ function groupCustomersByStatus(customers: Customer[]): Array<{ key: string; lab
     label,
     customers: customers.filter((customer) => customer.status === key),
   }));
+}
+
+const WORKFLOW_STEPS: Array<{
+  key: Customer["workflowStep"];
+  label: string;
+  helper: string;
+  icon: React.ReactNode;
+}> = [
+  { key: "questionnaire", label: "资料", helper: "完成三层问卷", icon: <ClipboardList size={16} /> },
+  { key: "trades", label: "交易", helper: "上传流水", icon: <Upload size={16} /> },
+  { key: "profile", label: "画像", helper: "校验特征", icon: <UserRound size={16} /> },
+  { key: "recommendation", label: "推荐", helper: "沟通方案", icon: <LineChartIcon size={16} /> },
+];
+
+function getWorkflowStepIndex(customer: Customer | null): number {
+  if (!customer) return 0;
+  return Math.max(0, WORKFLOW_STEPS.findIndex((item) => item.key === customer.workflowStep));
+}
+
+function WorkflowProgress({ customer }: { customer: Customer | null }) {
+  const activeIndex = getWorkflowStepIndex(customer);
+  const progress = Math.max(0, Math.min(100, customer?.workflowProgress ?? 0));
+
+  return (
+    <div className="workflow-panel" aria-label="客户流程进度">
+      <div className="workflow-panel-head">
+        <div>
+          <span>流程进度</span>
+          <strong>{progress}%</strong>
+        </div>
+        <span className="status-pill">{customer?.statusLabel ?? "--"}</span>
+      </div>
+      <div className="workflow-track" aria-hidden="true">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <div className="workflow-steps">
+        {WORKFLOW_STEPS.map((step, index) => {
+          const state = index < activeIndex || progress === 100
+            ? "complete"
+            : index === activeIndex
+              ? "active"
+              : "pending";
+          return (
+            <div className={`workflow-step ${state}`} key={step.key}>
+              <span className="workflow-step-icon">
+                {state === "complete" ? <CheckCircle2 size={16} /> : step.icon}
+              </span>
+              <span>
+                <strong>{step.label}</strong>
+                <small>{step.helper}</small>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CustomerCard({
+  customer,
+  active,
+  onOpen,
+}: {
+  customer: Customer;
+  active: boolean;
+  onOpen: (customer: Customer) => void;
+}) {
+  return (
+    <button
+      className={active ? "customer-card active" : "customer-card"}
+      type="button"
+      onClick={() => onOpen(customer)}
+    >
+      <span className="customer-card-main">
+        <strong>{customer.name}</strong>
+        <span className="status-pill">{customer.statusLabel}</span>
+      </span>
+      <span className="customer-next-action">{customer.nextAction}</span>
+      <span className="customer-progress-row">
+        <span className="customer-progress-track"><span style={{ width: `${customer.workflowProgress}%` }} /></span>
+        <b>{customer.workflowProgress}%</b>
+      </span>
+      <span className="customer-meta-grid">
+        <span><b>{customer.completedLevels.length}/3</b>问卷</span>
+        <span><b>{customer.tradeCount}</b>交易</span>
+        <span><b>{customer.confidenceLevel ? CONFIDENCE_LABELS[customer.confidenceLevel] : "--"}</b>置信度</span>
+      </span>
+      <span className="customer-card-action">
+        {customer.primaryActionLabel}
+        <ArrowRight size={14} />
+      </span>
+      <span className="customer-card-foot">更新：{formatDateTime(customer.lastUpdated)}</span>
+    </button>
+  );
+}
+
+function RecommendationReadiness({
+  customer,
+  hasProfile,
+  uploadsCount,
+  completedText,
+}: {
+  customer: Customer | null;
+  hasProfile: boolean;
+  uploadsCount: number;
+  completedText: string;
+}) {
+  const rows = [
+    { label: "问卷", value: completedText, ready: (customer?.completedLevels.length ?? 0) >= 3 },
+    { label: "交易", value: `${uploadsCount} 次上传`, ready: uploadsCount > 0 },
+    { label: "画像", value: hasProfile ? "已生成" : "未生成", ready: hasProfile },
+  ];
+
+  return (
+    <div className="readiness-grid" aria-label="推荐准备状态">
+      {rows.map((row) => (
+        <div className={row.ready ? "ready" : "blocked"} key={row.label}>
+          {row.ready ? <CheckCircle2 size={16} /> : <Clock size={16} />}
+          <span>{row.label}</span>
+          <strong>{row.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function AuthScreen({
@@ -342,6 +469,10 @@ export default function HomePage() {
   }, [fontScaleKey]);
 
   useEffect(() => {
+    if (window.innerWidth <= 768) setSidebarExpanded(false);
+  }, []);
+
+  useEffect(() => {
     function handleUnauthorized(event: Event) {
       const detail = event instanceof CustomEvent && typeof event.detail === "string"
         ? event.detail
@@ -363,13 +494,13 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!appState) return;
-    void fetchQuestionnaires(appState.currentCustomer.customerId).then((data) => {
+    if (!appState || !currentCustomerId) return;
+    void fetchQuestionnaires(currentCustomerId).then((data) => {
       setQuestionnaires(data.questionnaires);
       const next = findNextQuestionnaire(data.questionnaires, appState.completedLevels);
       setSelectedLevel(next?.level ?? "L3");
     });
-  }, [appState?.user.userId, appState?.currentCustomer.customerId]);
+  }, [appState, currentCustomerId]);
 
   useEffect(() => {
     if (!appState) return;
@@ -511,9 +642,28 @@ export default function HomePage() {
   const filteredCustomers = customers.filter((customer) => {
     const query = customerSearch.trim().toLowerCase();
     if (!query) return true;
-    return `${customer.name} ${customer.note} ${customer.statusLabel}`.toLowerCase().includes(query);
+    return `${customer.name} ${customer.note} ${customer.statusLabel} ${customer.primaryActionLabel} ${customer.blockedReason ?? ""}`
+      .toLowerCase()
+      .includes(query);
   });
   const customerGroups = groupCustomersByStatus(filteredCustomers);
+  const averageWorkflowProgress = customers.length
+    ? Math.round(customers.reduce((sum, customer) => sum + customer.workflowProgress, 0) / customers.length)
+    : 0;
+  const canRunRecommendation = Boolean(profile && currentCustomer?.workflowStep === "recommendation");
+
+  function openCustomerFromPool(customer: Customer) {
+    void selectCustomer(customer.customerId, customer.primaryActionPage);
+  }
+
+  function handlePrimaryAction() {
+    if (!currentCustomer) return;
+    if (currentCustomer.workflowStep === "recommendation" && profile) {
+      void runRecommendation();
+      return;
+    }
+    navigateToPage(currentCustomer.primaryActionPage);
+  }
 
   async function handleQuestionnaireSubmit() {
     if (!selectedQuestionnaire) return;
@@ -523,7 +673,10 @@ export default function HomePage() {
       const payload = buildQuestionnairePayload(selectedQuestionnaire, answers);
       const state = await submitQuestionnaire(selectedQuestionnaire.level, payload, currentCustomerId);
       setAppState(state);
-      const fresh = await fetchQuestionnaires(state.currentCustomer.customerId);
+      const freshCustomerId = state.currentCustomer?.customerId;
+      const fresh = freshCustomerId
+        ? await fetchQuestionnaires(freshCustomerId)
+        : { questionnaires };
       setQuestionnaires(fresh.questionnaires);
       setAnswers({});
       const next = findNextQuestionnaire(fresh.questionnaires, state.completedLevels);
@@ -551,7 +704,7 @@ export default function HomePage() {
     try {
       const state = await uploadTrades(file, uploadWindow, currentCustomerId);
       setAppState(state);
-      if (state.profile) {
+      if (state.profile && state.currentCustomer?.customerId) {
         try {
           await refreshRecommendationAndTrends(pickDefaultBackend(state), topN, state.currentCustomer.customerId);
           setBackend(pickDefaultBackend(state));
@@ -801,6 +954,7 @@ export default function HomePage() {
         <div className="user-strip">
           <strong>{appState.user.username}</strong>
           <span>当前客户：{currentCustomer?.name ?? "未选择客户"}</span>
+          <span>{currentCustomer ? `流程进度：${currentCustomer.workflowProgress}%` : "尚未选择客户"}</span>
           <span>{profile ? `画像置信度：${CONFIDENCE_LABELS[profile.confidenceLevel] ?? profile.confidenceLevel}` : "客户画像未初始化"}</span>
         </div>
         <nav className="nav-stack" aria-label="主导航">
@@ -827,12 +981,18 @@ export default function HomePage() {
         <div className="main-area-inner" ref={mainContentRef}>
           <header className="topbar compact">
             <div>
-              <p className="eyebrow">Next.js + FastAPI</p>
+              <p className="eyebrow">CRM Workflow</p>
               <h1>营业部销售客户工作台</h1>
             </div>
-            <button className="icon-button" type="button" onClick={() => void refreshState()} aria-label="刷新数据">
-              <RefreshCw size={18} />
-            </button>
+            <div className="topbar-actions">
+              <button className="sidebar-mobile-trigger" type="button" onClick={() => setSidebarExpanded(true)}>
+                <Menu size={16} />
+                导航
+              </button>
+              <button className="icon-button" type="button" onClick={() => void refreshState()} aria-label="刷新数据">
+                <RefreshCw size={18} />
+              </button>
+            </div>
           </header>
 
           {message ? <div className="success-strip">{message}</div> : null}
@@ -840,15 +1000,15 @@ export default function HomePage() {
 
           {activePage === "customers" ? (
             <section className="customer-pool-page">
-              <div className="workspace-panel customer-pool-toolbar">
+              <div className="workspace-panel customer-pool-toolbar crm-toolbar">
                 <div>
                   <div className="panel-head"><Users size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("customers")}>客户池</h2></div>
-                  <p className="status-text">按待办状态组织客户，优先处理资料、交易和推荐未完成的客户。</p>
+                  <p className="status-text">按客户推进状态组织待办，优先处理阻塞推荐生成的客户。</p>
                 </div>
                 <div className="customer-toolbar-actions">
                   <label className="field-label customer-search">
                     <span>搜索客户</span>
-                    <span className="input-with-icon"><Search size={16} /><input value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} placeholder="姓名、备注或状态" /></span>
+                    <span className="input-with-icon"><Search size={16} /><input value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} placeholder="姓名、备注、状态或下一步" /></span>
                   </label>
                   <div className="customer-create-box">
                     <label className="field-label">
@@ -866,42 +1026,30 @@ export default function HomePage() {
 
               <div className="status-grid customer-pool-summary">
                 <div><span>客户总数</span><strong>{customers.length}</strong></div>
+                <div><span>平均进度</span><strong>{averageWorkflowProgress}%</strong></div>
                 <div><span>待补资料</span><strong>{customers.filter((customer) => customer.status === "needs_questionnaire").length}</strong></div>
-                <div><span>待上传交易</span><strong>{customers.filter((customer) => customer.status === "needs_trades").length}</strong></div>
                 <div><span>可生成推荐</span><strong>{customers.filter((customer) => customer.status === "ready_to_recommend").length}</strong></div>
               </div>
 
               <div className="customer-group-stack">
                 {customerGroups.map((group) => (
-                  <section className="workspace-panel customer-group" key={group.key}>
+                  <section className={`workspace-panel customer-group ${group.key}`} key={group.key}>
                     <div className="customer-group-head">
                       <div>
                         <h3>{group.label}</h3>
-                        <p>{group.customers.length} 位客户</p>
+                        <p>{group.customers.length} 位客户需要处理</p>
                       </div>
                       {group.key === "ready_to_recommend" ? <CheckCircle2 size={18} /> : <Clock size={18} />}
                     </div>
                     {group.customers.length ? (
                       <div className="customer-card-grid">
                         {group.customers.map((customer) => (
-                          <button
-                            className={customer.customerId === currentCustomerId ? "customer-card active" : "customer-card"}
+                          <CustomerCard
                             key={customer.customerId}
-                            type="button"
-                            onClick={() => void selectCustomer(customer.customerId, "detail")}
-                          >
-                            <span className="customer-card-main">
-                              <strong>{customer.name}</strong>
-                              <span className="status-pill">{customer.statusLabel}</span>
-                            </span>
-                            <span className="customer-next-action">{customer.nextAction}</span>
-                            <span className="customer-meta-grid">
-                              <span><b>{customer.completedLevels.length}/3</b>问卷</span>
-                              <span><b>{customer.tradeCount}</b>交易</span>
-                              <span><b>{customer.confidenceLevel ? CONFIDENCE_LABELS[customer.confidenceLevel] : "--"}</b>置信度</span>
-                            </span>
-                            <span className="customer-card-foot">更新：{formatDateTime(customer.lastUpdated)}</span>
-                          </button>
+                            customer={customer}
+                            active={customer.customerId === currentCustomerId}
+                            onOpen={openCustomerFromPool}
+                          />
                         ))}
                       </div>
                     ) : (
@@ -930,16 +1078,30 @@ export default function HomePage() {
                   </div>
                   <span className="status-pill hero-status">{currentCustomer?.statusLabel ?? "--"}</span>
                 </div>
+                <WorkflowProgress customer={currentCustomer} />
+                {currentCustomer?.blockedReason ? (
+                  <div className="workflow-alert">
+                    <AlertCircle size={16} />
+                    <span>{currentCustomer.blockedReason}</span>
+                  </div>
+                ) : null}
                 <div className="status-grid customer-detail-summary">
-                  <div><span>下一步</span><strong>{currentCustomer?.nextAction ?? "--"}</strong></div>
+                  <div><span>下一步</span><strong>{currentCustomer?.primaryActionLabel ?? "--"}</strong></div>
                   <div><span>问卷完成度</span><strong>{completedText}</strong></div>
                   <div><span>上传次数</span><strong>{appState.uploads.length}</strong></div>
                   <div><span>画像置信度</span><strong>{profile ? CONFIDENCE_LABELS[profile.confidenceLevel] : "--"}</strong></div>
                 </div>
                 <div className="action-row customer-hero-actions">
                   <button className="secondary-button" type="button" onClick={() => navigateToPage("customers")}><Users size={16} />返回客户池</button>
-                  <button className="primary-button" type="button" onClick={() => void runRecommendation()} disabled={!profile || busy}><LineChartIcon size={16} />生成推荐方案</button>
+                  <button className="primary-button" type="button" onClick={handlePrimaryAction} disabled={!currentCustomer || busy || (currentCustomer.workflowStep === "recommendation" && !profile)}>
+                    <ArrowRight size={16} />
+                    {currentCustomer?.primaryActionLabel ?? "继续处理"}
+                  </button>
                 </div>
+              </div>
+              <div className="task-flow-label">
+                <span>客户推进任务</span>
+                <p>按资料、交易、画像、推荐顺序处理；已满足条件后可直接生成推荐。</p>
               </div>
               <div className="task-grid">
                 {renderQuestionnairePanel()}
@@ -951,9 +1113,27 @@ export default function HomePage() {
 
           {activePage === "recommend" ? (
             <section className="recommend-page">
-              <div className="workspace-panel">
+              <div className="workspace-panel recommend-command-panel">
                 <div className="panel-head"><LineChartIcon size={18} /><h2 className="content-focus-target" tabIndex={-1} ref={setContentFocusRef("recommend")}>推荐方案</h2></div>
-                <p className="status-text">当前客户：{currentCustomer?.name ?? "--"}</p>
+                <div className="recommend-context">
+                  <div>
+                    <p className="eyebrow">当前客户</p>
+                    <h3>{currentCustomer?.name ?? "--"}</h3>
+                    <p className="status-text">{currentCustomer?.nextAction ?? "选择客户后生成推荐方案。"}</p>
+                  </div>
+                  <RecommendationReadiness
+                    customer={currentCustomer}
+                    hasProfile={Boolean(profile)}
+                    uploadsCount={appState.uploads.length}
+                    completedText={completedText}
+                  />
+                </div>
+                {currentCustomer?.blockedReason ? (
+                  <div className="workflow-alert compact">
+                    <AlertCircle size={16} />
+                    <span>{currentCustomer.blockedReason}</span>
+                  </div>
+                ) : null}
                 <div className="recommend-controls">
                   <label className="field-label">匹配算法
                     <select value={backend} onChange={(event) => setBackend(event.target.value)}>
@@ -963,9 +1143,8 @@ export default function HomePage() {
                   <label className="field-label">Top N
                     <input type="number" min={1} max={20} value={topN} onChange={(event) => setTopN(Math.max(1, Math.min(20, Number(event.target.value))))} />
                   </label>
-                  <button className="primary-button" type="button" onClick={() => void runRecommendation()} disabled={!profile || busy}>生成推荐方案</button>
+                  <button className="primary-button" type="button" onClick={() => void runRecommendation()} disabled={!canRunRecommendation || busy}>生成推荐方案</button>
                 </div>
-                {!profile ? <p className="status-text">请先选择客户并完成问卷以获取推荐。</p> : null}
               </div>
 
               {recommendation ? (
@@ -1022,7 +1201,15 @@ export default function HomePage() {
                     </div>
                   </section>
                 </>
-              ) : null}
+              ) : (
+                <section className="workspace-panel empty-recommend-state">
+                  <LineChartIcon size={28} />
+                  <div>
+                    <h3>{canRunRecommendation ? "尚未生成推荐方案" : "推荐条件尚未满足"}</h3>
+                    <p>{canRunRecommendation ? "选择算法和 Top N 后生成推荐，系统会同步加载收益曲线。" : currentCustomer?.blockedReason ?? "请先选择客户并完成前置任务。"}</p>
+                  </div>
+                </section>
+              )}
             </section>
           ) : null}
 

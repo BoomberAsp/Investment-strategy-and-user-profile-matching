@@ -198,6 +198,46 @@ def _customer_status(entity_id: str, services: dict) -> tuple[str, str, str]:
     return "ready_to_recommend", "可生成推荐", "可生成推荐方案并与客户沟通"
 
 
+def _customer_workflow(entity_id: str, services: dict) -> dict[str, Any]:
+    completed = services["storage"].list_completed_levels(entity_id)
+    uploads = services["storage"].list_trade_uploads(entity_id)
+    profile = services["profile_svc"].get_profile(entity_id)
+    completed_count = len(completed)
+
+    if completed_count < 3:
+        next_level = f"L{completed_count + 1}"
+        return {
+            "workflowStep": "questionnaire",
+            "workflowProgress": round(completed_count / 3 * 45),
+            "primaryActionLabel": f"继续完成 {next_level} 问卷",
+            "primaryActionPage": "detail",
+            "blockedReason": f"客户资料尚未补齐，已完成 {completed_count}/3 份问卷。",
+        }
+    if not uploads:
+        return {
+            "workflowStep": "trades",
+            "workflowProgress": 60,
+            "primaryActionLabel": "上传交易数据",
+            "primaryActionPage": "detail",
+            "blockedReason": "缺少交易流水，暂不能验证客户真实交易行为。",
+        }
+    if profile is None or not profile.features:
+        return {
+            "workflowStep": "profile",
+            "workflowProgress": 78,
+            "primaryActionLabel": "生成客户画像",
+            "primaryActionPage": "detail",
+            "blockedReason": "交易已上传，但客户画像尚未生成或不可用。",
+        }
+    return {
+        "workflowStep": "recommendation",
+        "workflowProgress": 100,
+        "primaryActionLabel": "生成推荐方案",
+        "primaryActionPage": "recommend",
+        "blockedReason": None,
+    }
+
+
 def _customer_to_dict(customer, services: dict) -> dict[str, Any]:
     completed = services["storage"].list_completed_levels(customer.customer_id)
     uploads = services["storage"].list_trade_uploads(customer.customer_id)
@@ -218,6 +258,7 @@ def _customer_to_dict(customer, services: dict) -> dict[str, Any]:
         "tradeCount": sum(upload["trade_count"] for upload in uploads),
         "hasProfile": profile is not None and bool(profile.features),
         "confidenceLevel": profile.confidence_level if profile else None,
+        **_customer_workflow(customer.customer_id, services),
     }
 
 

@@ -101,6 +101,9 @@ export type CustomerStatus =
   | "needs_profile"
   | "ready_to_recommend";
 
+export type CustomerWorkflowStep = "questionnaire" | "trades" | "profile" | "recommendation";
+export type CustomerPrimaryActionPage = "detail" | "recommend";
+
 export type Customer = {
   customerId: string;
   ownerUserId: string;
@@ -116,6 +119,11 @@ export type Customer = {
   tradeCount: number;
   hasProfile: boolean;
   confidenceLevel: "low" | "medium" | "high" | null;
+  workflowStep: CustomerWorkflowStep;
+  workflowProgress: number;
+  primaryActionLabel: string;
+  primaryActionPage: CustomerPrimaryActionPage;
+  blockedReason: string | null;
 };
 
 export type AppState = {

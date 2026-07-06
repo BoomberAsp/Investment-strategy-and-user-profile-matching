@@ -2146,3 +2146,342 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 }
+
+/* ================================================================
+   CRM Workflow Refinements
+   ================================================================ */
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (min-width: 769px) {
+  .sidebar-toggle {
+    display: none;
+  }
+
+  .sidebar-backdrop.visible {
+    display: none;
+  }
+}
+
+.crm-toolbar {
+  border-top: 3px solid var(--blue);
+}
+
+.workflow-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dfe6f1;
+  border-radius: 8px;
+  background: #f9fbff;
+}
+
+.workflow-panel-head,
+.workflow-step,
+.customer-progress-row,
+.customer-card-action,
+.recommend-context {
+  display: flex;
+  align-items: center;
+}
+
+.workflow-panel-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-panel-head span,
+.workflow-step small,
+.customer-card-action,
+.task-flow-label p,
+.readiness-grid span {
+  color: var(--muted);
+}
+
+.workflow-panel-head strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 22px;
+}
+
+.workflow-track,
+.customer-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8edf5;
+}
+
+.workflow-track span,
+.customer-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--teal), var(--blue));
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workflow-step {
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e1e8f2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.workflow-step-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  color: var(--muted);
+  background: #f5f7fb;
+}
+
+.workflow-step strong,
+.workflow-step small {
+  display: block;
+}
+
+.workflow-step strong {
+  font-size: 13px;
+}
+
+.workflow-step small {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.workflow-step.active {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.workflow-step.active .workflow-step-icon {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: #eef4ff;
+}
+
+.workflow-step.complete .workflow-step-icon {
+  border-color: rgba(15, 159, 110, 0.35);
+  color: var(--green);
+  background: #effaf6;
+}
+
+.workflow-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid #f0d19a;
+  border-radius: 8px;
+  color: #76520c;
+  background: #fff8e8;
+  line-height: 1.5;
+}
+
+.workflow-alert.compact {
+  margin: 12px 0;
+}
+
+.customer-pool-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.customer-group.needs_questionnaire {
+  border-left: 4px solid var(--amber);
+}
+
+.customer-group.needs_trades,
+.customer-group.needs_profile {
+  border-left: 4px solid var(--blue);
+}
+
+.customer-group.ready_to_recommend {
+  border-left: 4px solid var(--green);
+}
+
+.customer-card {
+  gap: 12px;
+}
+
+.customer-progress-row {
+  gap: 10px;
+}
+
+.customer-progress-track {
+  flex: 1;
+}
+
+.customer-progress-row b {
+  min-width: 42px;
+  text-align: right;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.customer-card-action {
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #dce4ef;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.customer-card.active .customer-card-action,
+.customer-card:hover .customer-card-action {
+  border-color: rgba(37, 99, 235, 0.4);
+  color: var(--blue);
+  background: #f1f6ff;
+}
+
+.task-flow-label {
+  display: grid;
+  gap: 4px;
+}
+
+.task-flow-label span {
+  font-weight: 800;
+}
+
+.task-flow-label p {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.recommend-command-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.recommend-context {
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.recommend-context h3 {
+  margin-bottom: 4px;
+}
+
+.readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 10px;
+  min-width: min(520px, 100%);
+}
+
+.readiness-grid > div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dde5ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.readiness-grid > div.ready {
+  border-color: rgba(15, 159, 110, 0.28);
+  background: #f3fbf7;
+}
+
+.readiness-grid > div.blocked {
+  border-color: rgba(196, 129, 18, 0.28);
+  background: #fffaf0;
+}
+
+.readiness-grid svg {
+  grid-row: span 2;
+}
+
+.readiness-grid .ready svg {
+  color: var(--green);
+}
+
+.readiness-grid .blocked svg {
+  color: var(--amber);
+}
+
+.readiness-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.empty-recommend-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--muted);
+}
+
+.empty-recommend-state h3,
+.empty-recommend-state p {
+  margin: 0;
+}
+
+.empty-recommend-state h3 {
+  color: var(--ink);
+}
+
+.empty-recommend-state p {
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .workflow-steps,
+  .readiness-grid,
+  .recommend-context {
+    grid-template-columns: 1fr;
+  }
+
+  .recommend-context {
+    display: grid;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar.compact {
+    align-items: flex-start;
+  }
+
+  .sidebar-mobile-trigger {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 620px) {
+  .workflow-panel-head,
+  .customer-card-main,
+  .empty-recommend-state {
+    display: grid;
+    justify-items: start;
+  }
+
+  .workflow-step {
+    align-items: flex-start;
+  }
+}
