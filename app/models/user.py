@@ -54,6 +54,44 @@ class User:
 
 
 @dataclass
+class Customer:
+    customer_id: str
+    owner_user_id: str
+    name: str
+    status: str = "new"
+    note: str = ""
+    created_at: str = field(default_factory=_now)
+    last_updated: str = field(default_factory=_now)
+
+    @classmethod
+    def create(cls, customer_id: str, owner_user_id: str, name: str, note: str = "") -> "Customer":
+        return cls(
+            customer_id=customer_id,
+            owner_user_id=owner_user_id,
+            name=name,
+            note=note,
+        )
+
+    def touch(self):
+        self.last_updated = _now()
+
+    def to_dict(self) -> dict:
+        return {
+            "customer_id": self.customer_id,
+            "owner_user_id": self.owner_user_id,
+            "name": self.name,
+            "status": self.status,
+            "note": self.note,
+            "created_at": self.created_at,
+            "last_updated": self.last_updated,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Customer":
+        return cls(**d)
+
+
+@dataclass
 class UserProfile:
     user_id: str
 
@@ -167,6 +205,7 @@ class MatchingResult:
     phase2_rank: dict | None = None     # {strategy: phase2_rank}
     stat_score: dict | None = None      # {strategy: normalized_stat_score}
     ml_score: dict | None = None        # {strategy: normalized_ml_score}
+    metadata: dict | None = None        # backend-specific status, cache, and data-version info
 
     def to_dict(self) -> dict:
         return {
@@ -182,6 +221,7 @@ class MatchingResult:
             "phase2_rank": self.phase2_rank,
             "stat_score": self.stat_score,
             "ml_score": self.ml_score,
+            "metadata": self.metadata,
         }
 
     @classmethod

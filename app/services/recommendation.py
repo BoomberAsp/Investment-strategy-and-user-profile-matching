@@ -84,6 +84,7 @@ class RecommendationService:
             phase2_rank=result.get("phase2_rank"),
             stat_score=result.get("stat_score"),
             ml_score=result.get("ml_score"),
+            metadata=result.get("metadata"),
         )
 
     def compare_backends(

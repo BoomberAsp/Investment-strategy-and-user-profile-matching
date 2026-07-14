@@ -2,11 +2,16 @@
 # Web app — 策略匹配网页应用
 # ============================================================
 streamlit>=1.30.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9
+itsdangerous>=2.2.0
 
 # Data processing
 pandas>=2.0.0
 numpy>=1.24.0
 openpyxl>=3.1.0
+baostock>=0.8.8
 
 # ML / Stats
 scikit-learn>=1.3.0
@@ -15,6 +20,7 @@ scipy>=1.11.0
 # Visualization
 matplotlib>=3.7.0
 seaborn>=0.12.0
+plotly>=5.18.0
 
 # Concurrency
 filelock>=3.12.0

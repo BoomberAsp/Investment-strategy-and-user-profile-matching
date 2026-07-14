@@ -4,10 +4,10 @@
 
 提供**三条并行路线**：
 1. **传统统计学路线（主线）**：三层特征体系 + PCA + 径向惩罚余弦，可解释、可落地
-2. **LSTM 深度学习路线（辅线）**：BiLSTM 128 维序列风格匹配（DLMethod 团队输出），用于交叉验证
+2. **LSTM 深度学习路线（辅线）**：客户交易流水实时 token 化，使用 DLMethod 预训练 BiLSTM 生成 128 维序列风格向量，用于交叉验证
 3. **融合路线（推荐默认）**：α=0.7 统计 + 0.3 LSTM，Min-Max 归一化加权融合
 
-并配有 **Streamlit 网页应用**，支持用户注册登录、问卷调查、交易数据上传、动态画像更新、策略推荐与可视化。
+并配有 **Next.js + FastAPI 投顾工作台**，支持销售顾问管理客户池、推进问卷/交易/画像/推荐流程、上传交易数据、动态画像更新、策略推荐与可视化。Streamlit 旧入口仍保留用于对照。
 
 ---
 
@@ -88,14 +88,39 @@ python pipeline.py
 
 执行后将在 `output/` 目录下生成特征向量、PCA 结果、推荐结果与可视化图表。
 
-### 3. 启动网页应用
+### 3. 启动网页应用（Next.js + FastAPI）
+
+展示或本地预览推荐使用脚本启动：
 
 ```bash
-# 使用虚拟环境中的 Python
-investmentMatching/Scripts/python.exe -m streamlit run app.py
+# 启动 FastAPI 后端和 Next.js 前端
+scripts/start_preview.sh
+
+# 不用时关闭 8001/3001 上的预览进程
+scripts/stop_preview.sh
 ```
 
-浏览器自动打开 `http://localhost:8501`。
+启动后浏览器打开 `http://127.0.0.1:3001`。脚本会把日志写入 `logs/api.log` 和 `logs/frontend.log`。
+
+也可以手动启动：
+
+```bash
+# 终端 1：启动 Python API
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8001
+
+# 终端 2：启动 Next.js 前端
+cd frontend
+npm install
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001 npm run dev -- --hostname 127.0.0.1 --port 3001
+```
+
+浏览器打开 `http://127.0.0.1:3001`。
+
+Streamlit 旧入口仍保留用于对照：
+
+```bash
+python -m streamlit run app.py
+```
 
 ### 4. 生成模拟数据（可选）
 
@@ -106,6 +131,22 @@ python generate_simulated_data.py
 ```
 
 生成 500 个模拟策略 + 200 个模拟用户的交易数据，输出至 `output/simulated_data/`。
+
+### 5. 补充缺失行情数据（可选）
+
+推荐页的收益曲线会从 `market_data_full_raw/daily_by_symbol/` 按需读取日度行情。若新增策略或用户上传记录包含新的股票代码，可运行：
+
+```bash
+python scripts/fetch_missing_market_data.py
+```
+
+脚本会扫描内置策略池和模拟账户，下载缺失代码的不复权日线 CSV。若需要把本地上传用户的交易记录也纳入扫描：
+
+```bash
+python scripts/fetch_missing_market_data.py --include-app-uploads
+```
+
+Baostock 对部分可转债、申购代码、B 股可能返回空数据；这些代码在收益曲线中会按成交价固定估值，并在页面的数据质量提示中标记为近似结果。
 
 ---
 
@@ -118,7 +159,24 @@ Investment-strategy-and-user-profile-matching/
 │                                         # 三层特征提取 + PCA + 相似度计算
 ├── generate_simulated_data.py           # 模拟数据生成器（500策略+200用户）
 │
-├── app.py                               # Streamlit 网页应用主入口
+├── app.py                               # Streamlit legacy 入口（对照/回滚）
+│
+├── api/                                 # FastAPI 后端（Next.js 主入口调用）
+│   ├── main.py                          # 认证、问卷、上传、推荐、曲线 API
+│   └── services.py                      # 非 Streamlit 服务初始化器
+│
+├── frontend/                            # Next.js 主前端
+│   ├── app/                             # App Router 页面与全局样式
+│   ├── components/                      # 推荐卡片、图表、侧栏等 React 组件
+│   └── lib/api.ts                       # 前端 API 类型与请求封装
+│
+├── market_data_full_raw/                # 日度行情数据（收益曲线按需懒加载）
+│   └── daily_by_symbol/                 # 每个证券代码一个 CSV
+│
+├── scripts/
+│   ├── fetch_missing_market_data.py     # 下载缺失日度行情数据
+│   ├── start_preview.sh                 # 启动本地展示环境（API 8001 + 前端 3001）
+│   └── stop_preview.sh                  # 关闭本地展示环境
 │
 ├── stats_data/                          # 源数据（统一存放）
 │   ├── 量化策略绩效-1.xlsx              # DLMethod: 12 策略交易记录
@@ -145,6 +203,8 @@ Investment-strategy-and-user-profile-matching/
 │   │   ├── storage.py                   # JSON 文件存储引擎（含 filelock）
 │   │   ├── questionnaire.py             # 三级问卷定义 + 评分引擎
 │   │   ├── feature_extractor.py         # 从 pipeline.py 抽象出的特征提取
+│   │   ├── price_data.py                # 行情 CSV 懒加载服务
+│   │   ├── trend_service.py             # 客户/策略收益曲线计算 + Plotly 图表
 │   │   ├── profile.py                   # 画像管理 + EMA 动量更新
 │   │   ├── matching_backend.py          # 统一匹配引擎接口（抽象基类）
 │   │   ├── recommendation.py            # 推荐调度器
@@ -178,7 +238,11 @@ Investment-strategy-and-user-profile-matching/
 │   ├── step5_simulate_data.py           # 模拟数据
 │   ├── step6_lstm_contrastive.py        # LSTM 对比学习
 │   ├── step7_evaluation.py              # 评估归因
-│   ├── matching_phase2_lstm.csv         # LSTM 相似度矩阵（3 账户 × 37 策略）
+│   ├── models/lstm_encoder.pt           # 预训练 BiLSTM encoder
+│   ├── token_vocab.json                 # 交易风格 token 词表
+│   ├── strategy_embeddings.npy          # 37 策略 128 维向量
+│   ├── embedding_meta.json              # 策略名称和 embedding 元数据
+│   ├── matching_phase2_lstm.csv         # 旧版账户相似度矩阵（保留为训练产物）
 │   ├── final_recommendations.csv        # Top-N 推荐长表
 │   └── shap_analysis.json               # SHAP 特征归因
 │
@@ -215,6 +279,31 @@ Investment-strategy-and-user-profile-matching/
 - 用户 B：1727 笔交易，超短线高频风格（持仓 2 天）
 - 用户 C：285 笔交易，短线中频风格（胜率 67%）
 
+### 日度行情数据
+
+`market_data_full_raw/daily_by_symbol/` 存放收益曲线所需的不复权日线行情，每个证券代码一个 CSV。系统不会在启动时全量读取该目录，而是在用户打开推荐页并选择策略曲线时按涉及的证券代码懒加载。
+
+收益曲线计算口径：
+
+```
+totalAsset_t = cash_t + Σ(position_i_t × close_i_t)
+cumulativeReturn_t = (totalAsset_t / initialAsset - 1) × 100
+```
+
+当某些代码缺少日线行情时，系统使用首次成交价固定估值，并把该曲线标记为 `partial_missing_prices`。因此推荐页图表优先保证可展示，同时通过“数据质量提示”说明哪些代码使用了近似估值。
+
+### Next 前端替换说明
+
+本分支将主前端替换为 Next.js/Recharts/lucide 工作台，并通过 FastAPI 复用目标项目原有 Python service 层。Streamlit `app.py` 保留为 legacy 对照入口，但 README 主流程以 Next.js + FastAPI 为准。
+
+Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推荐、TopN 收益曲线对比、稳定性分析和设置。登录会话使用 HTTP-only signed cookie；账号、画像、问卷和上传记录继续使用目标项目现有 JSON 本地存储。
+
+推荐页默认展示 Top1 推荐策略曲线，点击推荐卡片会同步切换收益曲线；用户也可以手动勾选 TopN 中任意策略进行对比。客户曲线来自当前登录用户上传的交易记录；策略曲线使用全量日度行情按 `cash + position * close` 逐日重算，不直接复用 `strategy_nav`。`strategy_nav` 仍保留给原有推荐摘要、收益特征和稳定性分析逻辑使用。
+
+推荐页会展示交易更新时间、推荐生成时间、LSTM 状态、缓存命中、模型版本和策略宇宙版本。交易流水、LSTM 模型或策略 embedding 变化时，推荐缓存会按版本指纹自动失效并重算。
+
+本次补充行情后，内置策略和模拟账户中仍有少量代码 Baostock 返回空数据：`123254`, `123255`, `127110`, `200025`, `200028`, `200541`, `200550`, `732210`, `732406`, `900912`, `900913`, `900922`, `900929`, `900942`, `900945`, `900948`。这些代码主要来自可转债、申购代码和 B 股，收益曲线会按成交价固定估值并在页面提示中标记。
+
 ---
 
 ## 网页应用功能
@@ -241,7 +330,7 @@ Investment-strategy-and-user-profile-matching/
 | **完善问卷** | 三级渐进问卷（L1 必填 5 题、L2 可选 8 题、L3 可选 10 题） |
 | **上传交易数据** | 支持 Excel/CSV，可选择分析时间窗口（全量/30/60/120 天） |
 | **我的画像** | 12 维特征雷达图、画像变化轨迹、行业分布预览 |
-| **推荐策略** | Top-3 推荐 + 维度级归因 + 弹窗话术预览 + 双源排名 |
+| **推荐策略** | Top-3 推荐 + 维度级归因 + 弹窗话术预览 + 双源排名 + 收益曲线对比 |
 | **匹配稳定性** | 多窗口推荐对比 + 多后端对比 + 趋势图 + 一致性结论 |
 | **设置** | β 手动调整、数据导出/清除、后端切换、融合权重 α 调节 |
 
@@ -250,7 +339,7 @@ Investment-strategy-and-user-profile-matching/
 | 后端 | 定位 | 推荐场景 |
 |------|------|---------|
 | `statistical` | **主线**：12 维特征 + PCA + 径向惩罚余弦 | 可解释性优先 |
-| `lstm` | **辅线**：交易序列风格相似度 | 候选策略排序、互相验证 |
+| `lstm` | **辅线**：客户交易序列实时编码 + 策略 embedding 相似度 | 候选策略排序、互相验证 |
 | `fusion` | **推荐默认**：α=0.7 stat + 0.3 LSTM | 综合推荐 |
 
 ---
@@ -273,8 +362,11 @@ Investment-strategy-and-user-profile-matching/
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  app.py (Streamlit UI)                              │
-│  - 页面路由、交互组件、可视化                        │
+│  frontend/ (Next.js UI)                             │
+│  - 登录、问卷、上传、画像、推荐、曲线、设置            │
+├─────────────────────────────────────────────────────┤
+│  api/ (FastAPI HTTP API)                            │
+│  - Cookie 会话、文件上传、JSON response 适配          │
 ├─────────────────────────────────────────────────────┤
 │  app/services/ (业务服务层)                          │
 │  - RecommendationService: 调度匹配后端              │
@@ -285,7 +377,7 @@ Investment-strategy-and-user-profile-matching/
 ├─────────────────────────────────────────────────────┤
 │  app/services/backends/ (匹配算法层)                 │
 │  - StatisticalBackend: PCA + 径向惩罚余弦            │
-│  - LSTMBackend: DLMethod 预计算结果查表              │
+│  - LSTMBackend: 客户交易 token → BiLSTM embedding    │
 │  - FusionBackend: α 加权融合（Min-Max 归一化）       │
 │  统一接口: name() / fit() / predict() / get_all_metrics()
 ├─────────────────────────────────────────────────────┤
@@ -304,6 +396,8 @@ Investment-strategy-and-user-profile-matching/
 - **ETF 识别**：代码前缀模式匹配（15/51/56/58/12 开头）
 - **匹配引擎抽象**：通过 `MatchingBackend` 接口实现算法解耦，支持三后端切换
 - **画像置信度**：三级体系（low/medium/high），类比贝叶斯收缩思想
+- **实时 LSTM 推理**：客户上传交易流水会被标准化为多维风格 token，使用 `models/lstm_encoder.pt` 生成客户向量，再与 `strategy_embeddings.npy` 做相似度匹配
+- **版本化缓存**：LSTM 推荐缓存由客户交易指纹、模型指纹和策略宇宙版本共同决定，交易/模型/策略变化后自动重算
 - **双源策略融合**：统计方法与 LSTM 方法共享 37 种策略池，确保 FusionBackend 有共同策略进行加权融合
 - **Excel 数据适配器**：`excel_strategy_loader.py` 将 DLMethod Excel 格式自动转换为统计方法兼容格式，含 btype→BUY/SELL 映射和自动净值序列构建
 
@@ -314,7 +408,7 @@ Investment-strategy-and-user-profile-matching/
 1. 用户数据量有限（仅 3 个模拟用户）
 2. β 超参数未通过真实问卷校准
 3. 行业维度使用 ETF 占比代理，缺少申万行业精确映射
-4. 无法精确计算用户持仓市值（无个股行情数据）
+4. 部分证券代码缺少日线行情时，收益曲线会回退为成交价近似估值
 5. 密码存储使用 SHA-256（非生产级安全方案）
 6. LSTM 方法基于小样本弱监督学习，训练标签来自伪标签，适合作为统计方法的辅助
 
@@ -335,13 +429,15 @@ Investment-strategy-and-user-profile-matching/
 
 ### Phase 2（已完成 ✅）
 
-- [x] LSTMBackend 实现：加载 LSTM 相似度矩阵 + 推荐长表
+- [x] LSTMBackend 实现：客户交易流水实时推理 + 版本化缓存
 - [x] FusionBackend 实现：α=0.7 统计 + 0.3 LSTM，Min-Max 归一化
 - [x] 统计方法接入 37 种 DLMethod 策略（Excel 数据适配器）
 - [x] 三后端策略池对齐（44 种策略：7 原始 + 37 DLMethod）
 - [x] 推荐页面双源排名展示
 - [x] 设置页面后端切换 + 融合权重调节
 - [x] 源数据统一存放至 stats_data/ 目录
+- [x] 推荐页数据时效展示与推荐卡片/收益曲线联动
+- [x] 本地展示启动/关闭脚本
 
 ### Phase 3（后续迭代）
 

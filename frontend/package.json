@@ -1,0 +1,31 @@
+{
+  "name": "investment-strategy-matching-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9 <25"
+  },
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "next": "16.2.10",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^3.8.1"
+  },
+  "overrides": {
+    "baseline-browser-mapping": "2.9.19",
+    "caniuse-lite": "1.0.30001579"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
