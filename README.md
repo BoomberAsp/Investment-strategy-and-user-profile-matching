@@ -4,10 +4,10 @@
 
 提供**三条并行路线**：
 1. **传统统计学路线（主线）**：三层特征体系 + PCA + 径向惩罚余弦，可解释、可落地
-2. **LSTM 深度学习路线（辅线）**：BiLSTM 128 维序列风格匹配（DLMethod 团队输出），用于交叉验证
+2. **LSTM 深度学习路线（辅线）**：客户交易流水实时 token 化，使用 DLMethod 预训练 BiLSTM 生成 128 维序列风格向量，用于交叉验证
 3. **融合路线（推荐默认）**：α=0.7 统计 + 0.3 LSTM，Min-Max 归一化加权融合
 
-并配有 **Streamlit 网页应用**，支持用户注册登录、问卷调查、交易数据上传、动态画像更新、策略推荐与可视化。
+并配有 **Next.js + FastAPI 投顾工作台**，支持销售顾问管理客户池、推进问卷/交易/画像/推荐流程、上传交易数据、动态画像更新、策略推荐与可视化。Streamlit 旧入口仍保留用于对照。
 
 ---
 
@@ -90,17 +90,31 @@ python pipeline.py
 
 ### 3. 启动网页应用（Next.js + FastAPI）
 
+展示或本地预览推荐使用脚本启动：
+
+```bash
+# 启动 FastAPI 后端和 Next.js 前端
+scripts/start_preview.sh
+
+# 不用时关闭 8001/3001 上的预览进程
+scripts/stop_preview.sh
+```
+
+启动后浏览器打开 `http://127.0.0.1:3001`。脚本会把日志写入 `logs/api.log` 和 `logs/frontend.log`。
+
+也可以手动启动：
+
 ```bash
 # 终端 1：启动 Python API
-uvicorn api.main:app --reload --port 8000
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8001
 
 # 终端 2：启动 Next.js 前端
 cd frontend
 npm install
-npm run dev
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001 npm run dev -- --hostname 127.0.0.1 --port 3001
 ```
 
-浏览器打开 `http://localhost:3000`。Next.js 会把 `/api/*` 请求转发到 `http://localhost:8000`。
+浏览器打开 `http://127.0.0.1:3001`。
 
 Streamlit 旧入口仍保留用于对照：
 
@@ -160,7 +174,9 @@ Investment-strategy-and-user-profile-matching/
 │   └── daily_by_symbol/                 # 每个证券代码一个 CSV
 │
 ├── scripts/
-│   └── fetch_missing_market_data.py     # 下载缺失日度行情数据
+│   ├── fetch_missing_market_data.py     # 下载缺失日度行情数据
+│   ├── start_preview.sh                 # 启动本地展示环境（API 8001 + 前端 3001）
+│   └── stop_preview.sh                  # 关闭本地展示环境
 │
 ├── stats_data/                          # 源数据（统一存放）
 │   ├── 量化策略绩效-1.xlsx              # DLMethod: 12 策略交易记录
@@ -222,7 +238,11 @@ Investment-strategy-and-user-profile-matching/
 │   ├── step5_simulate_data.py           # 模拟数据
 │   ├── step6_lstm_contrastive.py        # LSTM 对比学习
 │   ├── step7_evaluation.py              # 评估归因
-│   ├── matching_phase2_lstm.csv         # LSTM 相似度矩阵（3 账户 × 37 策略）
+│   ├── models/lstm_encoder.pt           # 预训练 BiLSTM encoder
+│   ├── token_vocab.json                 # 交易风格 token 词表
+│   ├── strategy_embeddings.npy          # 37 策略 128 维向量
+│   ├── embedding_meta.json              # 策略名称和 embedding 元数据
+│   ├── matching_phase2_lstm.csv         # 旧版账户相似度矩阵（保留为训练产物）
 │   ├── final_recommendations.csv        # Top-N 推荐长表
 │   └── shap_analysis.json               # SHAP 特征归因
 │
@@ -278,7 +298,9 @@ cumulativeReturn_t = (totalAsset_t / initialAsset - 1) × 100
 
 Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推荐、TopN 收益曲线对比、稳定性分析和设置。登录会话使用 HTTP-only signed cookie；账号、画像、问卷和上传记录继续使用目标项目现有 JSON 本地存储。
 
-推荐页默认展示 Top1 推荐策略曲线，用户可以手动勾选 TopN 中任意策略进行对比。客户曲线来自当前登录用户上传的交易记录；策略曲线使用全量日度行情按 `cash + position * close` 逐日重算，不直接复用 `strategy_nav`。`strategy_nav` 仍保留给原有推荐摘要、收益特征和稳定性分析逻辑使用。
+推荐页默认展示 Top1 推荐策略曲线，点击推荐卡片会同步切换收益曲线；用户也可以手动勾选 TopN 中任意策略进行对比。客户曲线来自当前登录用户上传的交易记录；策略曲线使用全量日度行情按 `cash + position * close` 逐日重算，不直接复用 `strategy_nav`。`strategy_nav` 仍保留给原有推荐摘要、收益特征和稳定性分析逻辑使用。
+
+推荐页会展示交易更新时间、推荐生成时间、LSTM 状态、缓存命中、模型版本和策略宇宙版本。交易流水、LSTM 模型或策略 embedding 变化时，推荐缓存会按版本指纹自动失效并重算。
 
 本次补充行情后，内置策略和模拟账户中仍有少量代码 Baostock 返回空数据：`123254`, `123255`, `127110`, `200025`, `200028`, `200541`, `200550`, `732210`, `732406`, `900912`, `900913`, `900922`, `900929`, `900942`, `900945`, `900948`。这些代码主要来自可转债、申购代码和 B 股，收益曲线会按成交价固定估值并在页面提示中标记。
 
@@ -317,7 +339,7 @@ Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推
 | 后端 | 定位 | 推荐场景 |
 |------|------|---------|
 | `statistical` | **主线**：12 维特征 + PCA + 径向惩罚余弦 | 可解释性优先 |
-| `lstm` | **辅线**：交易序列风格相似度 | 候选策略排序、互相验证 |
+| `lstm` | **辅线**：客户交易序列实时编码 + 策略 embedding 相似度 | 候选策略排序、互相验证 |
 | `fusion` | **推荐默认**：α=0.7 stat + 0.3 LSTM | 综合推荐 |
 
 ---
@@ -355,7 +377,7 @@ Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推
 ├─────────────────────────────────────────────────────┤
 │  app/services/backends/ (匹配算法层)                 │
 │  - StatisticalBackend: PCA + 径向惩罚余弦            │
-│  - LSTMBackend: DLMethod 预计算结果查表              │
+│  - LSTMBackend: 客户交易 token → BiLSTM embedding    │
 │  - FusionBackend: α 加权融合（Min-Max 归一化）       │
 │  统一接口: name() / fit() / predict() / get_all_metrics()
 ├─────────────────────────────────────────────────────┤
@@ -374,6 +396,8 @@ Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推
 - **ETF 识别**：代码前缀模式匹配（15/51/56/58/12 开头）
 - **匹配引擎抽象**：通过 `MatchingBackend` 接口实现算法解耦，支持三后端切换
 - **画像置信度**：三级体系（low/medium/high），类比贝叶斯收缩思想
+- **实时 LSTM 推理**：客户上传交易流水会被标准化为多维风格 token，使用 `models/lstm_encoder.pt` 生成客户向量，再与 `strategy_embeddings.npy` 做相似度匹配
+- **版本化缓存**：LSTM 推荐缓存由客户交易指纹、模型指纹和策略宇宙版本共同决定，交易/模型/策略变化后自动重算
 - **双源策略融合**：统计方法与 LSTM 方法共享 37 种策略池，确保 FusionBackend 有共同策略进行加权融合
 - **Excel 数据适配器**：`excel_strategy_loader.py` 将 DLMethod Excel 格式自动转换为统计方法兼容格式，含 btype→BUY/SELL 映射和自动净值序列构建
 
@@ -384,7 +408,7 @@ Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推
 1. 用户数据量有限（仅 3 个模拟用户）
 2. β 超参数未通过真实问卷校准
 3. 行业维度使用 ETF 占比代理，缺少申万行业精确映射
-4. 无法精确计算用户持仓市值（无个股行情数据）
+4. 部分证券代码缺少日线行情时，收益曲线会回退为成交价近似估值
 5. 密码存储使用 SHA-256（非生产级安全方案）
 6. LSTM 方法基于小样本弱监督学习，训练标签来自伪标签，适合作为统计方法的辅助
 
@@ -405,13 +429,15 @@ Next 前端覆盖注册登录、问卷、上传交易、画像展示、策略推
 
 ### Phase 2（已完成 ✅）
 
-- [x] LSTMBackend 实现：加载 LSTM 相似度矩阵 + 推荐长表
+- [x] LSTMBackend 实现：客户交易流水实时推理 + 版本化缓存
 - [x] FusionBackend 实现：α=0.7 统计 + 0.3 LSTM，Min-Max 归一化
 - [x] 统计方法接入 37 种 DLMethod 策略（Excel 数据适配器）
 - [x] 三后端策略池对齐（44 种策略：7 原始 + 37 DLMethod）
 - [x] 推荐页面双源排名展示
 - [x] 设置页面后端切换 + 融合权重调节
 - [x] 源数据统一存放至 stats_data/ 目录
+- [x] 推荐页数据时效展示与推荐卡片/收益曲线联动
+- [x] 本地展示启动/关闭脚本
 
 ### Phase 3（后续迭代）
 
