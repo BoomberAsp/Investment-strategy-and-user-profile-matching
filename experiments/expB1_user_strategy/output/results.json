@@ -1,0 +1,246 @@
+{
+  "description": "Experiment B.1 Phase 5: Ranking evaluation of user-strategy matching.",
+  "n_users": 740,
+  "n_strategies": 37,
+  "n_adversarial_triples": 400,
+  "lambda_values": [
+    0.0,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    1.5,
+    2.0
+  ],
+  "random_baselines": {
+    "PRA": 0.5,
+    "Recall@1": 0.027,
+    "Recall@3": 0.0811,
+    "Recall@5": 0.1351,
+    "MRR": 0.1136
+  },
+  "full_results": {
+    "cosine": {
+      "PRA": 0.6338,
+      "Recall@1": 0.0824,
+      "Recall@3": 0.2014,
+      "Recall@5": 0.273,
+      "MRR": 0.1983,
+      "PRA_bootstrap": {
+        "mean": 0.6340040165165165,
+        "ci_lower": 0.6147841591591592,
+        "ci_upper": 0.6529307432432433,
+        "std": 0.009646512005052767
+      }
+    },
+    "euclidean": {
+      "PRA": 0.7787,
+      "Recall@1": 0.1162,
+      "Recall@3": 0.3095,
+      "Recall@5": 0.4257,
+      "MRR": 0.2763,
+      "PRA_bootstrap": {
+        "mean": 0.7786125375375375,
+        "ci_lower": 0.7641882507507508,
+        "ci_upper": 0.7932845345345345,
+        "std": 0.007420412915567583
+      }
+    },
+    "radial_0.0": {
+      "PRA": 0.6338,
+      "Recall@1": 0.0824,
+      "Recall@3": 0.2014,
+      "Recall@5": 0.273,
+      "MRR": 0.1983
+    },
+    "radial_0.25": {
+      "PRA": 0.7158,
+      "Recall@1": 0.0946,
+      "Recall@3": 0.2811,
+      "Recall@5": 0.3757,
+      "MRR": 0.2463
+    },
+    "radial_0.5": {
+      "PRA": 0.711,
+      "Recall@1": 0.1014,
+      "Recall@3": 0.2865,
+      "Recall@5": 0.3851,
+      "MRR": 0.2511
+    },
+    "radial_0.75": {
+      "PRA": 0.6817,
+      "Recall@1": 0.0905,
+      "Recall@3": 0.2865,
+      "Recall@5": 0.3824,
+      "MRR": 0.2362
+    },
+    "radial_1.0": {
+      "PRA": 0.6617,
+      "Recall@1": 0.0919,
+      "Recall@3": 0.2797,
+      "Recall@5": 0.377,
+      "MRR": 0.2312,
+      "PRA_bootstrap": {
+        "mean": 0.6616134384384383,
+        "ci_lower": 0.6406437687687688,
+        "ci_upper": 0.6823658033033033,
+        "std": 0.010554286523348931
+      }
+    },
+    "radial_1.5": {
+      "PRA": 0.6429,
+      "Recall@1": 0.0905,
+      "Recall@3": 0.273,
+      "Recall@5": 0.3581,
+      "MRR": 0.2248
+    },
+    "radial_2.0": {
+      "PRA": 0.6339,
+      "Recall@1": 0.0865,
+      "Recall@3": 0.2446,
+      "Recall@5": 0.3459,
+      "MRR": 0.2171
+    },
+    "mcnemar_radial_vs_cosine": {
+      "statistic": 63.188798347297144,
+      "p_value": 1.887379141862766e-15,
+      "n_discordant": 8713,
+      "a_wins_b_loses": 4728,
+      "b_wins_a_loses": 3985
+    },
+    "mcnemar_radial_vs_euclidean": {
+      "statistic": 2526.8815104166665,
+      "p_value": 0.0,
+      "n_discordant": 3840,
+      "a_wins_b_loses": 362,
+      "b_wins_a_loses": 3478
+    }
+  },
+  "adversarial_results": {
+    "cosine": {
+      "adversarial_pra": 0.6025,
+      "n_pairs": 400
+    },
+    "euclidean": {
+      "adversarial_pra": 0.6375,
+      "n_pairs": 400
+    },
+    "radial_0.0": {
+      "adversarial_pra": 0.6025,
+      "n_pairs": 400
+    },
+    "radial_0.25": {
+      "adversarial_pra": 0.53,
+      "n_pairs": 400
+    },
+    "radial_0.5": {
+      "adversarial_pra": 0.53,
+      "n_pairs": 400
+    },
+    "radial_0.75": {
+      "adversarial_pra": 0.53,
+      "n_pairs": 400
+    },
+    "radial_1.0": {
+      "adversarial_pra": 0.53,
+      "n_pairs": 400
+    },
+    "radial_1.5": {
+      "adversarial_pra": 0.53,
+      "n_pairs": 400
+    },
+    "radial_2.0": {
+      "adversarial_pra": 0.53,
+      "n_pairs": 400
+    }
+  },
+  "stratified_analysis": {
+    "cosine": {
+      "≤200": {
+        "n_users": 20,
+        "PRA": 0.9097,
+        "Recall@3": 0.45,
+        "MRR": 0.348
+      },
+      "201-500": {
+        "n_users": 340,
+        "PRA": 0.7269,
+        "Recall@3": 0.3029,
+        "MRR": 0.2854
+      },
+      "501-2000": {
+        "n_users": 320,
+        "PRA": 0.522,
+        "Recall@3": 0.0375,
+        "MRR": 0.083
+      },
+      ">2000": {
+        "n_users": 80,
+        "PRA": 0.5983,
+        "Recall@3": 0.3125,
+        "MRR": 0.2176
+      }
+    },
+    "euclidean": {
+      "≤200": {
+        "n_users": 20,
+        "PRA": 0.9236,
+        "Recall@3": 0.45,
+        "MRR": 0.4742
+      },
+      "201-500": {
+        "n_users": 340,
+        "PRA": 0.8418,
+        "Recall@3": 0.3824,
+        "MRR": 0.3474
+      },
+      "501-2000": {
+        "n_users": 320,
+        "PRA": 0.6999,
+        "Recall@3": 0.1781,
+        "MRR": 0.1827
+      },
+      ">2000": {
+        "n_users": 80,
+        "PRA": 0.741,
+        "Recall@3": 0.4125,
+        "MRR": 0.2488
+      }
+    },
+    "radial_1.0": {
+      "≤200": {
+        "n_users": 20,
+        "PRA": 0.8944,
+        "Recall@3": 0.45,
+        "MRR": 0.4404
+      },
+      "201-500": {
+        "n_users": 340,
+        "PRA": 0.732,
+        "Recall@3": 0.2706,
+        "MRR": 0.2502
+      },
+      "501-2000": {
+        "n_users": 320,
+        "PRA": 0.5511,
+        "Recall@3": 0.2062,
+        "MRR": 0.1796
+      },
+      ">2000": {
+        "n_users": 80,
+        "PRA": 0.6465,
+        "Recall@3": 0.5,
+        "MRR": 0.2567
+      }
+    }
+  },
+  "success_criteria": {
+    "check1_pra_gt_075": false,
+    "check2_radial_vs_cosine_5pp": false,
+    "check3_recall3_gt_030": false,
+    "check4_adversarial_8pp": false,
+    "check6_lambda0_degeneracy": true,
+    "passed": 1,
+    "total": 5
+  }
+}

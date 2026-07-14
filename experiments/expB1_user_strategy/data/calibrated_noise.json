@@ -1,0 +1,126 @@
+{
+  "description": "Per-feature calibrated noise σ. Computed as per-account bootstrap std (median across 3 accounts), 100 iterations per account, 80% subsample ratio.",
+  "bootstrap_iterations": 100,
+  "bootstrap_ratio": 0.8,
+  "account_ids": [
+    "A",
+    "B",
+    "C"
+  ],
+  "sigma_calibrated": {
+    "holding_period": 7.732276508247747,
+    "turnover_rate": 0.008948773458608308,
+    "buy_sell_ratio": 0.151993791518824,
+    "hhi_concentration": 0.008101051049440809,
+    "disposition_effect": 0.4764175802737371,
+    "positive_trade_ratio": 0.06801969512821662,
+    "etf_ratio": 0.0,
+    "avg_price_preference": 0.7475476016755275,
+    "position_uniformity": 0.011206224504003296,
+    "avg_loss_magnitude": 0.011302919191468919,
+    "vol_preference": 0.0446727218315177,
+    "trend_preference": 0.005248815116999049
+  },
+  "sigma_by_account": {
+    "A": {
+      "holding_period": 29.75612710014527,
+      "turnover_rate": 0.008948773458608308,
+      "buy_sell_ratio": 0.31624578767573125,
+      "hhi_concentration": 0.024173051715316047,
+      "disposition_effect": 1.4456891604172648,
+      "positive_trade_ratio": 0.08662506853250931,
+      "etf_ratio": 0.0,
+      "avg_price_preference": 0.7475476016755275,
+      "position_uniformity": 0.021701727714891556,
+      "avg_loss_magnitude": 0.017773425789964718,
+      "vol_preference": 0.05404896851183033,
+      "trend_preference": 0.013794921441865494
+    },
+    "B": {
+      "holding_period": 7.732276508247747,
+      "turnover_rate": 0.003129796815251733,
+      "buy_sell_ratio": 0.06600596128342334,
+      "hhi_concentration": 0.008101051049440809,
+      "disposition_effect": 0.07922188087616457,
+      "positive_trade_ratio": 0.019156974433932897,
+      "etf_ratio": 0.0,
+      "avg_price_preference": 0.48019758187083694,
+      "position_uniformity": 0.005496920571342793,
+      "avg_loss_magnitude": 0.009161077682577623,
+      "vol_preference": 0.014982437671530261,
+      "trend_preference": 0.005248815116999049
+    },
+    "C": {
+      "holding_period": 5.047957507745089,
+      "turnover_rate": 0.011867784202401779,
+      "buy_sell_ratio": 0.151993791518824,
+      "hhi_concentration": 0.003038357795280122,
+      "disposition_effect": 0.4764175802737371,
+      "positive_trade_ratio": 0.06801969512821662,
+      "etf_ratio": 0.008143616064748749,
+      "avg_price_preference": 1.6151393198054274,
+      "position_uniformity": 0.011206224504003296,
+      "avg_loss_magnitude": 0.011302919191468919,
+      "vol_preference": 0.0446727218315177,
+      "trend_preference": 0.003929434423855036
+    }
+  },
+  "sigma_strategy_level": {
+    "holding_period": 17.792261367363185,
+    "turnover_rate": 1.212825341141089,
+    "buy_sell_ratio": 0.04242480822650087,
+    "hhi_concentration": 0.04139031045826963,
+    "disposition_effect": 1.096128228206087,
+    "positive_trade_ratio": 0.12817452419672232,
+    "etf_ratio": 0.3502266690296057,
+    "avg_price_preference": 24.454584684190916,
+    "position_uniformity": 0.13831951984804858,
+    "avg_loss_magnitude": 0.024276851848776496,
+    "vol_preference": 0.8013043324510575,
+    "trend_preference": 0.08985161024023067
+  },
+  "noise_levels": {
+    "low": {
+      "holding_period": 3.8661382541238734,
+      "turnover_rate": 0.004474386729304154,
+      "buy_sell_ratio": 0.075996895759412,
+      "hhi_concentration": 0.004050525524720404,
+      "disposition_effect": 0.23820879013686855,
+      "positive_trade_ratio": 0.03400984756410831,
+      "etf_ratio": 0.0,
+      "avg_price_preference": 0.37377380083776374,
+      "position_uniformity": 0.005603112252001648,
+      "avg_loss_magnitude": 0.005651459595734459,
+      "vol_preference": 0.02233636091575885,
+      "trend_preference": 0.0026244075584995244
+    },
+    "mid": {
+      "holding_period": 7.732276508247747,
+      "turnover_rate": 0.008948773458608308,
+      "buy_sell_ratio": 0.151993791518824,
+      "hhi_concentration": 0.008101051049440809,
+      "disposition_effect": 0.4764175802737371,
+      "positive_trade_ratio": 0.06801969512821662,
+      "etf_ratio": 0.0,
+      "avg_price_preference": 0.7475476016755275,
+      "position_uniformity": 0.011206224504003296,
+      "avg_loss_magnitude": 0.011302919191468919,
+      "vol_preference": 0.0446727218315177,
+      "trend_preference": 0.005248815116999049
+    },
+    "high": {
+      "holding_period": 15.464553016495493,
+      "turnover_rate": 0.017897546917216615,
+      "buy_sell_ratio": 0.303987583037648,
+      "hhi_concentration": 0.016202102098881618,
+      "disposition_effect": 0.9528351605474742,
+      "positive_trade_ratio": 0.13603939025643325,
+      "etf_ratio": 0.0,
+      "avg_price_preference": 1.495095203351055,
+      "position_uniformity": 0.022412449008006593,
+      "avg_loss_magnitude": 0.022605838382937837,
+      "vol_preference": 0.0893454436630354,
+      "trend_preference": 0.010497630233998098
+    }
+  }
+}

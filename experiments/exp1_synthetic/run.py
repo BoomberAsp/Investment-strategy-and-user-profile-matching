@@ -312,6 +312,9 @@ def main():
     type_ids = sorted(set(y))
     results_summary: dict = {}
 
+    # Precompute distance matrix for euclidean Silhouette
+    dist_euc = cdist(X_pca, X_pca, metric="euclidean")
+
     for name, s in sim.items():
         print(f"\n  --- {name} ---")
         for k in K_VALUES:
@@ -327,35 +330,26 @@ def main():
             ] for i in range(len(y))]),
             labels=type_ids,
         )
+        # Silhouette: convert similarity to distance and evaluate with ground-truth labels
+        if name == "euclidean":
+            dist_mat = dist_euc
+        else:
+            dist_mat = np.clip(1.0 - s, 0, None)
         results_summary[name] = dict(
             accuracy_k1=evaluate_knn(s, y, 1),
             accuracy_k3=evaluate_knn(s, y, 3),
             accuracy_k5=evaluate_knn(s, y, 5),
-            silhouette=silhouette_score(X_pca, y, metric="euclidean"),
+            silhouette=silhouette_score(dist_mat, y, metric="precomputed"),
         )
 
     # ── 5. Silhouette ──
     sil_results = {}
-    # Use PCA-space distances for Silhouette (precomputed not directly supported
-    # with arbitrary similarity; we use the feature matrix in PCA space)
-    for name in sim:
-        # For Silhouette we need a distance metric, not similarity.
-        # Use Euclidean distance in PCA space as the underlying metric for all
-        # three — Silhouette compares cluster assignments against the SAME
-        # distance space.  The fair comparison is: do the three similarity
-        # metrics induce _different clusterings_ whose Silhouette on the SAME
-        # distance metric differs?
-        pass   # see below — we compute per-metric k-NN clusterings instead
-
-    # Build clusterings from each metric's k-NN (k=1) classification result
     for name, s_mat in sim.items():
-        preds = []
-        for i in range(len(y)):
-            order = np.argsort(-s_mat[i])
-            neighbour = [idx for idx in order if idx != i][0]
-            preds.append(y[neighbour])
-        preds_arr = np.array(preds)
-        sil = silhouette_score(X_pca, preds_arr, metric="euclidean") if len(set(preds_arr)) > 1 else 0.0
+        if name == "euclidean":
+            dist_mat = dist_euc
+        else:
+            dist_mat = np.clip(1.0 - s_mat, 0, None)
+        sil = silhouette_score(dist_mat, y, metric="precomputed")
         sil_results[name] = sil
         print(f"    {name} Silhouette = {sil:.4f}")
 
