@@ -77,6 +77,11 @@ class FusionBackend(MatchingBackend):
                 "phase2_rank": {},
                 "stat_score": {s: float(v) for s, v in stat_result.get("all_sims", {}).items()},
                 "ml_score": {},
+                "metadata": {
+                    "lstmStatus": "no_common_strategies",
+                    "lstmMessage": "统计后端和 LSTM 后端没有共同策略集合，融合推荐降级为统计方法。",
+                    "cacheHit": False,
+                },
             }
 
         # Step 1: 统计得分
@@ -91,11 +96,12 @@ class FusionBackend(MatchingBackend):
 
         if not ml_all_sims:
             # LSTM 无映射账户 → 降级为纯统计推荐
+            lstm_metadata = lstm_result.get("metadata", {})
             return {
                 "top3": stat_result.get("top3", [])[:top_n],
                 "explanation": {
                     **stat_result.get("explanation", {}),
-                    "fusion_note": "LSTM 账户未分配，仅使用统计方法结果",
+                    "fusion_note": lstm_metadata.get("lstmMessage", "LSTM 暂不可用，仅使用统计方法结果"),
                 },
                 "metric_used": f"Fusion (α={self._alpha}, stat-only fallback)",
                 "all_sims": stat_all_sims,
@@ -103,6 +109,10 @@ class FusionBackend(MatchingBackend):
                 "phase2_rank": {},
                 "stat_score": {s: float(v) for s, v in stat_all_sims.items()},
                 "ml_score": {},
+                "metadata": {
+                    **lstm_metadata,
+                    "fusionFallback": "statistical",
+                },
             }
 
         # Step 3: 对齐共同策略
@@ -159,6 +169,10 @@ class FusionBackend(MatchingBackend):
             "phase2_rank": phase2_rank,
             "stat_score": stat_norm,
             "ml_score": ml_norm,
+            "metadata": {
+                **lstm_result.get("metadata", {}),
+                "fusionFallback": None,
+            },
         }
 
     def get_all_metrics(

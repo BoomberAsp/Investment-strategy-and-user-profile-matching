@@ -115,7 +115,7 @@ def init_services() -> dict:
     stat_backend.fit(strategy_features, strategy_nav)
     registry.register(stat_backend)
 
-    lstm_backend = LSTMBackend()
+    lstm_backend = LSTMBackend(storage)
     lstm_available = True
     try:
         lstm_backend.fit(strategy_features, strategy_nav)

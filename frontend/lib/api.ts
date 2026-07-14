@@ -136,6 +136,7 @@ export type AppState = {
   backends: BackendOption[];
   lstmAvailable: boolean;
   lstmAssignedAccounts: Record<string, string>;
+  dataStatus: DataStatus;
   fusionAlpha: number;
   featureChart: FeatureChartItem[];
 };
@@ -186,6 +187,22 @@ export type Recommendation = {
   explanation: string;
 };
 
+export type DataStatus = {
+  tradeFingerprint?: string | null;
+  tradeLastUpdated?: string | null;
+  tradeFileCount?: number;
+  tradeCount?: number;
+  modelFingerprint?: string | null;
+  strategyUniverseVersion?: string | null;
+  lstmStatus?: string | null;
+  lstmMessage?: string | null;
+  cacheHit?: boolean;
+  tokenCount?: number;
+  validTokenCount?: number;
+  unknownTokenCount?: number;
+  fusionFallback?: string | null;
+};
+
 export type RecommendResponse = {
   customer: {
     id: string;
@@ -203,6 +220,13 @@ export type RecommendResponse = {
   popupText: string;
   explanation: Record<string, unknown>;
   recommendations: Recommendation[];
+  dataStatus: DataStatus;
+  tradeFingerprint?: string | null;
+  strategyUniverseVersion?: string | null;
+  modelFingerprint?: string | null;
+  generatedAt?: string;
+  cacheHit?: boolean;
+  lstmStatus?: string | null;
   pca: { explained_variance: number[] };
 };
 

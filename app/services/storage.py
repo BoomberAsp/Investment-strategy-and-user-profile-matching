@@ -4,6 +4,7 @@ JSON 文件存储引擎
 
 import json
 import csv
+import hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -229,6 +230,42 @@ class StorageService:
                 "trade_count": len(df),
             })
         return uploads
+
+    def trade_data_status(self, user_id: str) -> dict:
+        """返回客户交易文件的版本指纹与最后更新时间。"""
+        files = sorted(self.trades_dir.glob(f"{user_id}_*.csv"))
+        if not files:
+            return {
+                "tradeFingerprint": "no-trades",
+                "tradeLastUpdated": None,
+                "tradeFileCount": 0,
+                "tradeCount": 0,
+            }
+
+        digest = hashlib.sha256()
+        trade_count = 0
+        last_mtime = 0.0
+        for path in files:
+            stat = path.stat()
+            last_mtime = max(last_mtime, stat.st_mtime)
+            digest.update(path.name.encode("utf-8"))
+            digest.update(str(stat.st_size).encode("utf-8"))
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            try:
+                import pandas as pd
+
+                trade_count += len(pd.read_csv(path))
+            except Exception:
+                pass
+
+        return {
+            "tradeFingerprint": digest.hexdigest()[:16],
+            "tradeLastUpdated": datetime.fromtimestamp(last_mtime, timezone.utc).isoformat(),
+            "tradeFileCount": len(files),
+            "tradeCount": trade_count,
+        }
 
     # ===== 问卷存档 =====
 

@@ -326,7 +326,7 @@ def _strategy_symbols(strategy_id: str, limit: int = 8) -> list[str]:
 
 
 @lru_cache(maxsize=128)
-def _cached_strategy_trend(strategy_id: str) -> dict[str, Any]:
+def _cached_strategy_trend(strategy_id: str, strategy_universe_version: str) -> dict[str, Any]:
     from app.services.trend_service import compute_strategy_trend
 
     trades_df = _services()["strategy_trades"].get(strategy_id)
@@ -346,6 +346,21 @@ def _cached_strategy_trend(strategy_id: str) -> dict[str, Any]:
             },
         }
     return compute_strategy_trend(strategy_id, trades_df)
+
+
+def _data_status(entity_id: str, services: dict) -> dict[str, Any]:
+    trade_status = services["storage"].trade_data_status(entity_id)
+    lstm_status = {}
+    if hasattr(services["lstm_backend"], "get_data_status"):
+        lstm_status = services["lstm_backend"].get_data_status(entity_id)
+    return {
+        "tradeFingerprint": trade_status.get("tradeFingerprint"),
+        "tradeLastUpdated": trade_status.get("tradeLastUpdated"),
+        "tradeFileCount": trade_status.get("tradeFileCount", 0),
+        "tradeCount": trade_status.get("tradeCount", 0),
+        "modelFingerprint": lstm_status.get("modelFingerprint"),
+        "strategyUniverseVersion": lstm_status.get("strategyUniverseVersion"),
+    }
 
 
 def _recommendation_to_dict(item: dict[str, Any], result, index: int) -> dict[str, Any]:
@@ -450,6 +465,7 @@ def _app_state(user, customer_id: str | None = None) -> dict[str, Any]:
         ],
         "lstmAvailable": bool(services["lstm_available"]),
         "lstmAssignedAccounts": services["lstm_backend"].get_assigned_accounts(),
+        "dataStatus": _data_status(entity_id, services),
         "fusionAlpha": _safe_float(getattr(services["fusion_backend"], "_alpha", 0.7), 0.7),
         "featureChart": _profile_feature_chart(profile, services["strategy_features"]),
     }
@@ -628,16 +644,12 @@ async def upload_trades(
         window_days=ROLLING_WINDOW_OPTIONS.get(window, None),
     )
 
-    lstm_account = None
-    if services["lstm_available"]:
-        lstm_account = services["lstm_backend"].assign_account(entity_id)
-
     return {
         "message": "上传成功，画像已更新。",
         "filename": file.filename,
         "tradeCount": len(trades_df),
         "profile": _profile_to_dict(profile),
-        "lstmAccount": lstm_account,
+        "lstmAccount": None,
         **_app_state(user, entity_id),
     }
 
@@ -673,6 +685,19 @@ def recommend(payload: RecommendPayload, customer_id: str | None = None, user=De
         _recommendation_to_dict(item, result, index)
         for index, item in enumerate(result.top_n)
     ]
+    metadata = result.metadata or {}
+    data_status = {
+        **_data_status(entity_id, services),
+        **{key: value for key, value in metadata.items() if key in {
+            "lstmStatus",
+            "lstmMessage",
+            "cacheHit",
+            "tokenCount",
+            "validTokenCount",
+            "unknownTokenCount",
+            "fusionFallback",
+        }},
+    }
     return {
         "customer": {
             "id": entity_id,
@@ -690,6 +715,13 @@ def recommend(payload: RecommendPayload, customer_id: str | None = None, user=De
         "popupText": result.popup_text,
         "explanation": result.explanation,
         "recommendations": recommendations,
+        "dataStatus": data_status,
+        "tradeFingerprint": data_status.get("tradeFingerprint"),
+        "strategyUniverseVersion": data_status.get("strategyUniverseVersion"),
+        "modelFingerprint": data_status.get("modelFingerprint"),
+        "generatedAt": result.timestamp,
+        "cacheHit": bool(metadata.get("cacheHit", False)),
+        "lstmStatus": metadata.get("lstmStatus"),
         "pca": {"explained_variance": []},
     }
 
@@ -712,8 +744,9 @@ def trends(payload: TrendPayload, customer_id: str | None = None, user=Depends(c
         )
 
     strategy_trends = {}
+    strategy_version = _data_status(entity_id, services).get("strategyUniverseVersion") or "unknown"
     for strategy_id in payload.strategy_ids:
-        strategy_trends[strategy_id] = _cached_strategy_trend(strategy_id)
+        strategy_trends[strategy_id] = _cached_strategy_trend(strategy_id, strategy_version)
 
     return {
         "customerTrend": customer_trend,

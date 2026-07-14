@@ -90,6 +90,12 @@ LSTM_SIMILARITY_MATRIX = DLMETHOD_DIR / "matching_phase2_lstm.csv"
 LSTM_RECOMMENDATIONS = DLMETHOD_DIR / "final_recommendations.csv"
 LSTM_SHAP_ANALYSIS = DLMETHOD_DIR / "shap_analysis.json"
 LSTM_EMBEDDING_META = DLMETHOD_DIR / "embedding_meta.json"
+LSTM_TOKEN_VOCAB = DLMETHOD_DIR / "token_vocab.json"
+LSTM_STRATEGY_EMBEDDINGS = DLMETHOD_DIR / "strategy_embeddings.npy"
+LSTM_MODEL_FILE = DLMETHOD_DIR / "models" / "lstm_encoder.pt"
+LSTM_INDUSTRY_MAPPING_REVIEW = DLMETHOD_DIR / "stock_industry_mapping_review.csv"
+LSTM_INDUSTRY_MAPPING = DLMETHOD_DIR / "stock_industry_mapping.csv"
+LSTM_CACHE_DIR = DATA_DIR / "lstm_cache"
 
 # === 融合权重 ===
 FUSION_ALPHA = 0.7  # 统计方法权重，1-alpha = LSTM 权重

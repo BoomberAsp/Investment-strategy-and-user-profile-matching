@@ -49,6 +49,7 @@ import {
   uploadTrades,
   type AppState,
   type Customer,
+  type DataStatus,
   type Question,
   type Questionnaire,
   type RecommendResponse,
@@ -95,6 +96,57 @@ function formatDateTime(value: string | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function lstmStatusLabel(status: string | null | undefined): string {
+  if (!status) return "未运行";
+  const labels: Record<string, string> = {
+    ok: "实时序列匹配可用",
+    no_trades: "缺少交易流水",
+    insufficient_tokens: "交易序列样本不足",
+    missing_user_id: "缺少客户 ID",
+    legacy_account_disabled: "已停用槽位模式",
+    no_common_strategies: "策略集合不一致",
+  };
+  return labels[status] ?? status;
+}
+
+function DataStatusStrip({ status, generatedAt }: { status?: DataStatus | null; generatedAt?: string }) {
+  if (!status) return null;
+  const cacheText = status.cacheHit ? "复用已计算结果" : "本次重新计算";
+  const tokenText = typeof status.validTokenCount === "number"
+    ? `${status.validTokenCount}/${status.tokenCount ?? status.validTokenCount} token`
+    : "token --";
+
+  return (
+    <div className="data-status-strip">
+      <div>
+        <span>交易更新</span>
+        <strong>{formatDateTime(status.tradeLastUpdated)}</strong>
+      </div>
+      <div>
+        <span>推荐生成</span>
+        <strong>{formatDateTime(generatedAt)}</strong>
+      </div>
+      <div>
+        <span>LSTM 状态</span>
+        <strong>{lstmStatusLabel(status.lstmStatus)}</strong>
+      </div>
+      <div>
+        <span>缓存</span>
+        <strong>{cacheText}</strong>
+      </div>
+      <div>
+        <span>版本</span>
+        <strong>{(status.strategyUniverseVersion ?? "--").slice(0, 8)} / {(status.modelFingerprint ?? "--").slice(0, 8)}</strong>
+      </div>
+      <div>
+        <span>序列覆盖</span>
+        <strong>{tokenText}</strong>
+      </div>
+      {status.lstmMessage ? <p>{status.lstmMessage}</p> : null}
+    </div>
+  );
 }
 
 function pickDefaultBackend(state: AppState | null): string {
@@ -576,6 +628,11 @@ export default function HomePage() {
     setTrendStrategyIds(nextTrendIds);
     setTrendData(await fetchTrends(nextTrendIds, nextCustomerId));
     return data;
+  }
+
+  function handleRecommendationSelect(strategyId: string) {
+    setSelectedStrategyId(strategyId);
+    setTrendStrategyIds([strategyId]);
   }
 
   async function handleLogout() {
@@ -1134,6 +1191,10 @@ export default function HomePage() {
                     <span>{currentCustomer.blockedReason}</span>
                   </div>
                 ) : null}
+                <DataStatusStrip
+                  status={recommendation?.dataStatus ?? appState.dataStatus}
+                  generatedAt={recommendation?.generatedAt}
+                />
                 <div className="recommend-controls">
                   <label className="field-label">匹配算法
                     <select value={backend} onChange={(event) => setBackend(event.target.value)}>
@@ -1154,7 +1215,7 @@ export default function HomePage() {
                     isLoading={false}
                     isRecommending={busy}
                     selectedStrategyId={selectedStrategyId}
-                    onSelectStrategy={setSelectedStrategyId}
+                    onSelectStrategy={handleRecommendationSelect}
                     customerProfile={recommendation.customer}
                     pcaVariance={recommendation.pca.explained_variance.map((v) => `${Math.round(v * 100)}%`).join(" / ")}
                   />
