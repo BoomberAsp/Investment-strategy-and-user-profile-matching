@@ -1,0 +1,97 @@
+{
+  "description": "Hard negative strategy pairs: cos_sim > 0.7 AND norm_ratio > 1.5. Selected 10 diverse pairs via greedy novelty-first selection.",
+  "n_candidate_pairs": 389,
+  "n_selected": 10,
+  "pairs": [
+    {
+      "pair_id": 0,
+      "strategy_a": "双创50增强",
+      "strategy_b": "机器人ETF优选策略",
+      "cos_sim": 0.9988,
+      "norm_ratio": 2.288,
+      "norm_a": 91.44,
+      "norm_b": 39.96
+    },
+    {
+      "pair_id": 1,
+      "strategy_a": "申万动量",
+      "strategy_b": "计算机ETF优选策略",
+      "cos_sim": 0.9978,
+      "norm_ratio": 2.0163,
+      "norm_a": 24.46,
+      "norm_b": 49.33
+    },
+    {
+      "pair_id": 2,
+      "strategy_a": "中证1000增强",
+      "strategy_b": "国企etf增强",
+      "cos_sim": 0.9978,
+      "norm_ratio": 1.5367,
+      "norm_a": 26.18,
+      "norm_b": 17.03
+    },
+    {
+      "pair_id": 3,
+      "strategy_a": "中证800增强",
+      "strategy_b": "双创50增强",
+      "cos_sim": 0.9977,
+      "norm_ratio": 2.554,
+      "norm_a": 35.8,
+      "norm_b": 91.44
+    },
+    {
+      "pair_id": 4,
+      "strategy_a": "军工etf增强",
+      "strategy_b": "申万动量",
+      "cos_sim": 0.9969,
+      "norm_ratio": 2.5709,
+      "norm_a": 62.89,
+      "norm_b": 24.46
+    },
+    {
+      "pair_id": 5,
+      "strategy_a": "创业板300ETF增强",
+      "strategy_b": "沪深300增强策略",
+      "cos_sim": 0.9963,
+      "norm_ratio": 2.9432,
+      "norm_a": 15.98,
+      "norm_b": 47.04
+    },
+    {
+      "pair_id": 6,
+      "strategy_a": "国证2000ETF增强",
+      "strategy_b": "游戏etf增强",
+      "cos_sim": 0.9959,
+      "norm_ratio": 1.7076,
+      "norm_a": 19.45,
+      "norm_b": 33.22
+    },
+    {
+      "pair_id": 7,
+      "strategy_a": "中证800增强",
+      "strategy_b": "国企etf增强",
+      "cos_sim": 0.9957,
+      "norm_ratio": 2.1018,
+      "norm_a": 35.8,
+      "norm_b": 17.03
+    },
+    {
+      "pair_id": 8,
+      "strategy_a": "中证800增强",
+      "strategy_b": "旅游etf增强",
+      "cos_sim": 0.9955,
+      "norm_ratio": 1.9989,
+      "norm_a": 35.8,
+      "norm_b": 17.91
+    },
+    {
+      "pair_id": 9,
+      "strategy_a": "医疗etf增强",
+      "strategy_b": "国企etf增强",
+      "cos_sim": 0.9955,
+      "norm_ratio": 1.5684,
+      "norm_a": 26.72,
+      "norm_b": 17.03
+    }
+  ]
+}
